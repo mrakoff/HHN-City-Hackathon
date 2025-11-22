@@ -1,0 +1,16 @@
+ORDER FORM
+
+Order Number: ORD-221125-0002
+Customer Name: Maria Schmidt
+Email: maria.schmidt@example.de
+Phone: +49 89 98765432
+
+Delivery Address: Marienplatz 8, 80331 München
+Description: Urgent delivery needed for event tomorrow. Please handle with care.
+
+Items:
+  10x Product X
+  1x Product Y
+
+Priority: NORMAL
+Delivery Window: 2025-11-23 07:51 to 2025-11-23 19:51

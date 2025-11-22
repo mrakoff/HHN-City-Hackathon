@@ -1,0 +1,17 @@
+ORDER FORM
+
+Order Number: ORD-221125-0001
+Customer Name: Thomas Müller
+Email: thomas.mueller@example.de
+Phone: +49 30 12345678
+
+Delivery Address: Hauptstraße 123, 10115 Berlin
+Description: Standard delivery for office supplies. Please deliver during business hours.
+
+Items:
+  5x Widget A
+  3x Widget B
+  2x Widget C
+
+Priority: NORMAL
+Delivery Window: 2025-11-23 19:51 to 2025-11-24 19:51

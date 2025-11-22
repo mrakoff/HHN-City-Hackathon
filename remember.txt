@@ -1,0 +1,7 @@
+How to Use
+Start the backend server:
+   cd backend   uvicorn main:app --reload
+Add the 5 drivers:
+   python3 scripts/add_drivers.py
+Run the test suite:
+   python3 scripts/test_orders.py

@@ -2,12 +2,12 @@ from typing import List, Dict, Optional, Any
 from .route_optimizer import optimize_route, calculate_route_improvement
 from .route_calculator import calculate_distance
 
-# Try to use OpenAI if available
+# Try to use Gemini if available
 try:
-    import openai
-    OPENAI_AVAILABLE = True
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    GEMINI_AVAILABLE = False
 
 
 def suggest_route_optimization(
@@ -205,12 +205,15 @@ def generate_route_summary(route: Dict[str, Any]) -> str:
     """
     Generate a human-readable summary of a route using AI
     """
-    if OPENAI_AVAILABLE:
+    if GEMINI_AVAILABLE:
         try:
-            # OpenAI client will use OPENAI_API_KEY from environment
-            client = openai.OpenAI()
+            import os
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-2.5-flash')
 
-            prompt = f"""Generate a brief, helpful summary for a delivery driver about their route.
+                prompt = f"""Generate a brief, helpful summary for a delivery driver about their route.
 
 Route details:
 - Driver: {route.get('driver_name', 'Unknown')}
@@ -219,19 +222,10 @@ Route details:
 
 Generate a friendly, concise summary (2-3 sentences) that helps the driver understand their route."""
 
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that generates route summaries for delivery drivers."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=100
-            )
-
-            return response.choices[0].message.content.strip()
+                response = model.generate_content(prompt)
+                return response.text.strip()
         except Exception as e:
-            print(f"Error generating AI summary: {e}")
+            print(f"Error generating Gemini summary: {e}")
 
     # Fallback to simple summary
     num_stops = len(route.get('orders', []))

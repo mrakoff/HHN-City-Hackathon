@@ -28,7 +28,13 @@
                 <div class="actions">
                     <button class="btn btn-primary" onclick="showAddOrderModal()">+ Add Order</button>
                     <button class="btn btn-secondary" onclick="showUploadModal()">📄 Upload Document</button>
+                    <button class="btn btn-secondary" onclick="showPhoneCallModal()">📞 Simulate Phone Call</button>
                 </div>
+            </div>
+
+            <div class="order-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd;">
+                <button class="order-tab-btn active" onclick="switchOrderView('all')" data-view="all">All Orders</button>
+                <button class="order-tab-btn" onclick="switchOrderView('unfinished')" data-view="unfinished">Unfinished Orders</button>
             </div>
 
             <div class="filters">

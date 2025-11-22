@@ -1,5 +1,44 @@
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta
 from ..models import OrderCreate
+
+
+def calculate_priority_from_time_window(
+    delivery_time_window_start: Optional[datetime] = None,
+    delivery_time_window_end: Optional[datetime] = None,
+    explicit_priority: Optional[str] = None
+) -> str:
+    """
+    Calculate priority based on delivery time window.
+    If explicit priority is provided, use it. Otherwise:
+    - No time window = low priority
+    - Time window > 3 days away = normal priority
+    - Time window 1-3 days away = high priority
+    - Time window < 24 hours away = urgent priority
+    """
+    if explicit_priority:
+        return explicit_priority
+
+    if not delivery_time_window_start or not delivery_time_window_end:
+        return "low"
+
+    now = datetime.now()
+    time_until_start = delivery_time_window_start - now
+
+    # If the time window has already passed, mark as urgent
+    if time_until_start.total_seconds() < 0:
+        return "urgent"
+
+    hours_until_start = time_until_start.total_seconds() / 3600
+
+    if hours_until_start < 24:
+        return "urgent"
+    elif hours_until_start < 72:  # 3 days
+        return "high"
+    elif hours_until_start < 168:  # 7 days
+        return "normal"
+    else:
+        return "low"
 
 
 def validate_order(order: OrderCreate) -> List[str]:

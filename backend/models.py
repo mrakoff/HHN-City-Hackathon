@@ -83,6 +83,7 @@ class OrderBase(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
+    description: Optional[str] = None
 
 
 class OrderCreate(OrderBase):
@@ -90,7 +91,7 @@ class OrderCreate(OrderBase):
     items: Optional[List[Dict[str, Any]]] = None
     delivery_time_window_start: Optional[datetime] = None
     delivery_time_window_end: Optional[datetime] = None
-    priority: Optional[str] = "normal"
+    priority: Optional[str] = None  # Will be auto-set based on time window
     source: Optional[str] = None
     raw_text: Optional[str] = None
 
@@ -100,6 +101,7 @@ class OrderUpdate(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[str] = None
+    description: Optional[str] = None
     items: Optional[List[Dict[str, Any]]] = None
     delivery_time_window_start: Optional[datetime] = None
     delivery_time_window_end: Optional[datetime] = None
@@ -185,3 +187,9 @@ class DriverUpdateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Phone Call / Text Parsing Models
+class ParseTextRequest(BaseModel):
+    text: str
+    source: str = "phone"

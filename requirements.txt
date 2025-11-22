@@ -7,10 +7,18 @@ python-multipart>=0.0.6
 pytesseract>=0.3.10
 Pillow>=10.2.0
 python-dotenv>=1.0.0
-openai>=1.3.5
+google-generativeai>=0.3.0
+# openai>=1.3.5  # Removed: Using Gemini instead
+faster-whisper>=1.0.0  # Local Whisper model for speech-to-text (no API key needed, requires Python 3.10-3.13)
+# Note: For Python 3.14, use Python 3.13 environment (.venv313) for speech-to-text
+sounddevice>=0.4.6  # For audio recording (optional, for future use)
+scipy>=1.11.0  # For audio processing (optional, for future use)
 websockets>=12.0
 aiofiles>=23.2.1
 requests>=2.31.0
 # ortools>=9.8.3296  # Optional: Install manually if Python 3.8-3.12 is available
 # Note: OR-Tools may not support Python 3.14. The system will use a fallback algorithm if not available.
 geopy>=2.4.1
+reportlab>=4.0.0
+pdfplumber>=0.10.0
+PyPDF2>=3.0.0

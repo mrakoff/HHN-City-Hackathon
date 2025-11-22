@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  osrm:
+    image: osrm/osrm-backend
+    container_name: osrm-routing
+    ports:
+      - "5001:5000"  # Using 5001 because macOS ControlCenter uses port 5000
+    volumes:
+      - ./osrm-data:/data
+    command: osrm-routed --algorithm mld /data/baden-wuerttemberg-latest.osm
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/route/v1/driving/9.21,48.78;9.18,48.77?overview=false"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

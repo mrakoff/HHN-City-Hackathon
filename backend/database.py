@@ -60,6 +60,7 @@ class Order(Base):
     customer_phone = Column(String)
     customer_email = Column(String)
     delivery_address = Column(String, nullable=False)
+    description = Column(Text)  # Order description/notes
     latitude = Column(Float)
     longitude = Column(Float)
     items = Column(JSON)  # List of items with quantities
@@ -105,6 +106,25 @@ class RouteOrder(Base):
 
     route = relationship("Route", back_populates="route_orders")
     order = relationship("Order", back_populates="route_orders")
+
+
+class RouteWaypoint(Base):
+    __tablename__ = "route_waypoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    route_id = Column(Integer, ForeignKey("routes.id"), nullable=False)
+    sequence = Column(Integer, nullable=False)  # Order in the route
+    waypoint_type = Column(String, nullable=False)  # depot, parking, delivery
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    location_id = Column(Integer)  # ID of depot, parking_location, or order
+    location_type = Column(String)  # depot, parking_location, order
+    waypoint_data = Column(JSON)  # Additional waypoint data (renamed from metadata)
+    estimated_arrival = Column(DateTime)
+    actual_arrival = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    route = relationship("Route")
 
 
 class DriverUpdate(Base):
