@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help - Route Planning System</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .help-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .help-section {
+            margin-bottom: 30px;
+        }
+        .help-section h2 {
+            color: #3498db;
+            margin-bottom: 15px;
+        }
+        .help-section h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .help-section ul {
+            margin-left: 20px;
+        }
+        .help-section li {
+            margin-bottom: 8px;
+        }
+        .shortcut {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="help-content">
+        <h1>Route Planning System - Help Guide</h1>
+
+        <div class="help-section">
+            <h2>Getting Started</h2>
+            <p>Welcome to the Route Planning System! This guide will help you get started with managing orders, drivers, and routes.</p>
+        </div>
+
+        <div class="help-section">
+            <h2>Keyboard Shortcuts</h2>
+            <ul>
+                <li><span class="shortcut">Ctrl/Cmd + N</span> - Create new item (order, driver, or route depending on active tab)</li>
+                <li><span class="shortcut">Esc</span> - Close modal</li>
+                <li><span class="shortcut">1</span> - Switch to Orders tab</li>
+                <li><span class="shortcut">2</span> - Switch to Drivers tab</li>
+                <li><span class="shortcut">3</span> - Switch to Routes tab</li>
+                <li><span class="shortcut">4</span> - Switch to Locations tab</li>
+            </ul>
+        </div>
+
+        <div class="help-section">
+            <h2>Managing Orders</h2>
+            <h3>Adding Orders</h3>
+            <ul>
+                <li><strong>Manual Entry:</strong> Click "Add Order" and fill in the delivery address and customer information</li>
+                <li><strong>Upload Document:</strong> Click "Upload Document" to upload scanned orders from email, fax, or mail. The system will automatically extract order information using OCR.</li>
+                <li><strong>Phone Orders:</strong> Use the "Parse Text" feature to enter orders received via phone calls</li>
+            </ul>
+
+            <h3>Order Status</h3>
+            <ul>
+                <li><strong>Pending:</strong> Order is waiting to be assigned to a route</li>
+                <li><strong>Assigned:</strong> Order has been added to a route</li>
+                <li><strong>In Transit:</strong> Driver is currently delivering this order</li>
+                <li><strong>Completed:</strong> Order has been successfully delivered</li>
+            </ul>
+        </div>
+
+        <div class="help-section">
+            <h2>Managing Drivers</h2>
+            <p>Add drivers who will be making deliveries. Each driver can have multiple routes assigned to them.</p>
+            <ul>
+                <li>Driver status can be: Available, On Route, or Offline</li>
+                <li>Driver location can be tracked for dynamic route updates</li>
+            </ul>
+        </div>
+
+        <div class="help-section">
+            <h2>Creating and Optimizing Routes</h2>
+            <h3>Creating a Route</h3>
+            <ol>
+                <li>Select a driver</li>
+                <li>Add orders to the route</li>
+                <li>Click "Optimize" to automatically reorder stops for efficiency</li>
+            </ol>
+
+            <h3>Route Optimization</h3>
+            <p>The system uses AI-powered optimization to minimize travel distance and time. Click the "Optimize" button on any route to automatically reorder the stops.</p>
+        </div>
+
+        <div class="help-section">
+            <h2>Managing Locations</h2>
+            <h3>Depots</h3>
+            <p>Depots are the starting points for routes. Add your warehouse or distribution center locations.</p>
+
+            <h3>Parking Locations</h3>
+            <p>Add known parking locations near delivery areas. The system can suggest parking locations when planning routes.</p>
+        </div>
+
+        <div class="help-section">
+            <h2>Tips</h2>
+            <ul>
+                <li>Always verify parsed orders from documents - OCR may make mistakes</li>
+                <li>Use route optimization before finalizing routes</li>
+                <li>Check for validation errors on orders before assigning them to routes</li>
+                <li>Update driver locations regularly for accurate dynamic route suggestions</li>
+            </ul>
+        </div>
+
+        <div class="help-section">
+            <h2>Support</h2>
+            <p>For issues or questions, please contact your system administrator.</p>
+        </div>
+    </div>
+</body>
+</html>

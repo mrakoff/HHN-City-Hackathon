@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Planning - Planner Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Route Planning Dashboard</h1>
+            <nav class="tabs">
+                <button class="tab-btn active" data-tab="orders">Orders (1)</button>
+                <button class="tab-btn" data-tab="drivers">Drivers (2)</button>
+                <button class="tab-btn" data-tab="routes">Routes (3)</button>
+                <button class="tab-btn" data-tab="locations">Locations (4)</button>
+                <button class="btn btn-secondary" onclick="window.open('help.html', '_blank')" style="margin-left: auto;">Help</button>
+            </nav>
+        </header>
+
+        <!-- Orders Tab -->
+        <div id="orders-tab" class="tab-content active">
+            <div class="section-header">
+                <h2>Order Management</h2>
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="showAddOrderModal()">+ Add Order</button>
+                    <button class="btn btn-secondary" onclick="showUploadModal()">📄 Upload Document</button>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select id="order-status-filter" onchange="loadOrders()">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="completed">Completed</option>
+                </select>
+                <select id="order-source-filter" onchange="loadOrders()">
+                    <option value="">All Sources</option>
+                    <option value="email">Email</option>
+                    <option value="fax">Fax</option>
+                    <option value="mail">Mail</option>
+                    <option value="phone">Phone</option>
+                </select>
+            </div>
+
+            <div id="orders-list" class="orders-grid"></div>
+        </div>
+
+        <!-- Drivers Tab -->
+        <div id="drivers-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Driver Management</h2>
+                <button class="btn btn-primary" onclick="showAddDriverModal()">+ Add Driver</button>
+            </div>
+            <div id="drivers-list" class="drivers-grid"></div>
+        </div>
+
+        <!-- Routes Tab -->
+        <div id="routes-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Route Planning</h2>
+                <button class="btn btn-primary" onclick="showCreateRouteModal()">+ Create Route</button>
+            </div>
+            <div id="routes-list" class="routes-list"></div>
+            <div id="route-map-container" class="map-container">
+                <div id="route-map"></div>
+            </div>
+        </div>
+
+        <!-- Locations Tab -->
+        <div id="locations-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Location Management</h2>
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="showAddDepotModal()">+ Add Depot</button>
+                    <button class="btn btn-secondary" onclick="showAddParkingModal()">+ Add Parking</button>
+                </div>
+            </div>
+            <div class="locations-section">
+                <div>
+                    <h3>Depots</h3>
+                    <div id="depots-list"></div>
+                </div>
+                <div>
+                    <h3>Parking Locations</h3>
+                    <div id="parking-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

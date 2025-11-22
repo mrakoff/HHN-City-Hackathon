@@ -1,0 +1,41 @@
+Challenge “Routeplanning & Logistics”
+Problem:
+• Many small and medium businesses still plan their routes manually
+(Excel, phone, paper).
+• Often one person is responsible for all planning under high time
+pressure.
+• New orders, changes, depots and parking locations must be constantly
+updated.
+• This makes planning slow, error-prone and stressful.
+Imagine planning an entire city’s delivery network.
+At Hack the Route, you’ll take control of urban logistics and lead it into the AI era.
+Opportunity:
+• Use GenAI, smart interfaces and KI-workflows to support
+• Build a very lean, but flexible planning process that can be reused
+across many SMEs.
+• Turn route planning from a bottleneck into a smart, assistive workflow.
+Your Mission:
+• Design a minimal core workflow for daily tour
+planning in SMEs.
+• Build an intuitive interface for a single planner
+to
+• enter/import new orders,
+• manage depots, intermediate stops
+and parking locations
+• Focus on:
+• Simple but Flexible process
+• Interactive and Smart interface
+• Intregration of GenAI, AI-Workflow, AI-
+Agents
+Using existing open-source route optimisation is optional bonus, not
+the main task.
+Your Impact:
+• The planner can create daily routes faster
+and with less stress.
+• SMEs get a practical, adaptable blueprint
+for smart route planning.
+• Low entry barrier: can be used even by
+companies with very limited IT resources.
+• You help bring real KI-support into
+everyday operations of small businesses
+not as a buzzword, but as a working tool
