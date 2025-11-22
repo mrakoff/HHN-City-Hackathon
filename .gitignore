@@ -8,6 +8,8 @@ env/
 venv/
 ENV/
 .venv
+.venv313
+.DS_Store
 
 # Database
 *.db
