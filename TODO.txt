@@ -1,0 +1,14 @@
+GOALS:
+	- eliviate mannual labor
+	- traffic-efficiency, sustainability
+_____________________________________________
+
+PERSONA PLANNER
+	- minimize manual labor
+	- error checking
+	- scanning
+	- reduce planning
+
+PERSONA DRIVER
+	- simple user interface
+	- option to communicate with the customer (?)
