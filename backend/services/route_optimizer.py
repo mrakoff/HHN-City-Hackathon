@@ -140,6 +140,137 @@ def optimize_route_ortools(
     return None
 
 
+def calculate_distance_matrix(points: List[Tuple[float, float]]) -> List[List[float]]:
+    """Calculate distance matrix for all point pairs"""
+    n = len(points)
+    matrix = [[0.0] * n for _ in range(n)]
+
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                matrix[i][j] = calculate_distance(
+                    points[i][0], points[i][1],
+                    points[j][0], points[j][1]
+                )
+    return matrix
+
+
+def two_opt_swap(route: List[int], i: int, j: int) -> List[int]:
+    """Perform 2-opt swap: reverse segment between i and j"""
+    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+    return new_route
+
+
+def calculate_route_distance(route: List[int], distance_matrix: List[List[float]]) -> float:
+    """Calculate total distance for a route"""
+    if len(route) < 2:
+        return 0.0
+
+    total = 0.0
+    current = 0  # Start at depot
+
+    for order_idx in route:
+        total += distance_matrix[current][order_idx + 1]  # +1 because depot is index 0
+        current = order_idx + 1
+
+    # Return to depot
+    total += distance_matrix[current][0]
+    return total
+
+
+def optimize_route_2opt(
+    depot: Dict[str, float],
+    orders: List[Dict[str, float]],
+    parking_locations: Optional[List[Dict[str, Any]]] = None,
+    max_iterations: int = 100
+) -> List[int]:
+    """
+    2-opt route optimization algorithm
+    Returns list of order indices in optimized order
+    """
+    if not orders:
+        return []
+
+    # Pre-compute parking spots for each order if parking_locations provided
+    order_parking = {}
+    if parking_locations:
+        for i, order in enumerate(orders):
+            parking = find_nearest_parking(
+                order['lat'], order['lon'],
+                parking_locations
+            )
+            if parking:
+                order_parking[i] = parking
+
+    # Build list of all points
+    depot_lat = depot.get('lat') or depot.get('latitude')
+    depot_lon = depot.get('lon') or depot.get('longitude')
+    all_points = [(depot_lat, depot_lon)]  # Depot is index 0
+    point_to_order_idx = {0: None}
+
+    for i, order in enumerate(orders):
+        if i in order_parking:
+            parking = order_parking[i]
+            all_points.append((parking["latitude"], parking["longitude"]))
+            point_to_order_idx[len(all_points) - 1] = i
+        else:
+            order_lat = order.get('lat') or order.get('latitude')
+            order_lon = order.get('lon') or order.get('longitude')
+            all_points.append((order_lat, order_lon))
+            point_to_order_idx[len(all_points) - 1] = i
+
+    # Get distance matrix (prefer OSRM, fallback to Haversine)
+    distance_matrix = None
+    if OSRM_AVAILABLE and check_osrm_available():
+        try:
+            distance_matrix = get_table(all_points)
+            if distance_matrix:
+                # Convert meters to km for consistency
+                distance_matrix = [[d / 1000.0 for d in row] for row in distance_matrix]
+                logger.debug("Using OSRM distance matrix for 2-opt optimization")
+        except Exception as e:
+            logger.warning(f"OSRM table failed, using Haversine: {e}")
+
+    if not distance_matrix:
+        distance_matrix = calculate_distance_matrix(all_points)
+
+    # Start with nearest neighbor solution
+    initial_route = optimize_route_simple(depot, orders, parking_locations)
+    best_route = initial_route.copy()
+    best_distance = calculate_route_distance(best_route, distance_matrix)
+
+    # 2-opt improvement
+    improved = True
+    iteration = 0
+    improvements_made = 0
+
+    logger.info(f"Starting 2-opt optimization on route with {len(best_route)} stops, initial distance: {best_distance:.2f}km")
+
+    while improved and iteration < max_iterations:
+        improved = False
+        iteration += 1
+
+        for i in range(len(best_route) - 1):
+            for j in range(i + 2, len(best_route)):
+                # Try 2-opt swap
+                new_route = two_opt_swap(best_route, i, j)
+                new_distance = calculate_route_distance(new_route, distance_matrix)
+
+                if new_distance < best_distance:
+                    best_route = new_route
+                    best_distance = new_distance
+                    improved = True
+                    improvements_made += 1
+                    logger.debug(f"2-opt improvement at iteration {iteration}: {new_distance:.2f}km (saved {(best_distance - new_distance):.2f}km)")
+                    break
+
+            if improved:
+                break
+
+    logger.info(f"2-opt optimization completed in {iteration} iterations, {improvements_made} improvements made, final distance: {best_distance:.2f}km")
+    return best_route
+
+
 def optimize_route_simple(
     depot: Dict[str, float],
     orders: List[Dict[str, float]],
@@ -164,7 +295,9 @@ def optimize_route_simple(
                 order_parking[i] = parking
 
     # Build list of all points for OSRM distance table
-    all_points = [(depot['lat'], depot['lon'])]
+    depot_lat = depot.get('lat') or depot.get('latitude')
+    depot_lon = depot.get('lon') or depot.get('longitude')
+    all_points = [(depot_lat, depot_lon)]
     point_to_order_idx = {0: None}  # Depot has no order index
 
     for i, order in enumerate(orders):
@@ -173,16 +306,24 @@ def optimize_route_simple(
             all_points.append((parking["latitude"], parking["longitude"]))
             point_to_order_idx[len(all_points) - 1] = i
         else:
-            all_points.append((order['lat'], order['lon']))
+            order_lat = order.get('lat') or order.get('latitude')
+            order_lon = order.get('lon') or order.get('longitude')
+            all_points.append((order_lat, order_lon))
             point_to_order_idx[len(all_points) - 1] = i
 
     # Try to get OSRM distance table
-    distance_table = None
+    distance_matrix = None
     if OSRM_AVAILABLE and check_osrm_available():
         try:
-            distance_table = get_table(all_points)
+            distance_matrix = get_table(all_points)
+            if distance_matrix:
+                # Convert meters to km for consistency
+                distance_matrix = [[d / 1000.0 for d in row] for row in distance_matrix]
         except Exception as e:
             logger.debug(f"OSRM table failed in simple optimizer: {e}")
+
+    if not distance_matrix:
+        distance_matrix = calculate_distance_matrix(all_points)
 
     unvisited = list(range(len(orders)))
     route = []
@@ -204,18 +345,8 @@ def optimize_route_simple(
             if target_point_idx is None:
                 continue
 
-            # Get distance using OSRM table or Haversine
-            if distance_table and current_idx < len(distance_table) and target_point_idx < len(distance_table[current_idx]):
-                distance_meters = distance_table[current_idx][target_point_idx]
-                distance_km = distance_meters / 1000.0
-            else:
-                # Fallback to Haversine
-                current_point = all_points[current_idx]
-                target_point = all_points[target_point_idx]
-                distance_km = calculate_distance(
-                    current_point[0], current_point[1],
-                    target_point[0], target_point[1]
-                )
+            # Get distance from current position
+            distance_km = distance_matrix[current_idx][target_point_idx]
 
             if distance_km < nearest_distance:
                 nearest_distance = distance_km
@@ -249,10 +380,10 @@ def optimize_route(
             if result is not None:
                 return result
         except Exception as e:
-            print(f"OR-Tools optimization failed: {e}, falling back to simple algorithm")
+            logger.warning(f"OR-Tools optimization failed: {e}, falling back to 2-opt algorithm")
 
-    # Fallback to simple nearest-neighbor
-    return optimize_route_simple(depot, orders, parking_locations)
+    # Use 2-opt optimization (better than simple nearest neighbor)
+    return optimize_route_2opt(depot, orders, parking_locations)
 
 
 def calculate_route_improvement(
@@ -269,21 +400,20 @@ def calculate_route_improvement(
             return 0.0
 
         total = 0.0
-        current = depot
+        current_lat = depot.get('lat') or depot.get('latitude')
+        current_lon = depot.get('lon') or depot.get('longitude')
 
         for idx in route_indices:
             order = orders[idx]
-            total += calculate_distance(
-                current['lat'], current['lon'],
-                order['lat'], order['lon']
-            )
-            current = order
+            order_lat = order.get('lat') or order.get('latitude')
+            order_lon = order.get('lon') or order.get('longitude')
+            total += calculate_distance(current_lat, current_lon, order_lat, order_lon)
+            current_lat, current_lon = order_lat, order_lon
 
         # Return to depot
-        total += calculate_distance(
-            current['lat'], current['lon'],
-            depot['lat'], depot['lon']
-        )
+        depot_lat = depot.get('lat') or depot.get('latitude')
+        depot_lon = depot.get('lon') or depot.get('longitude')
+        total += calculate_distance(current_lat, current_lon, depot_lat, depot_lon)
 
         return total
 

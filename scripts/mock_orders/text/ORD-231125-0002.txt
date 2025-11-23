@@ -1,0 +1,19 @@
+ORDER FORM
+
+Order Number: ORD-231125-0002
+Customer Name: Maria Schmidt
+Email: maria.schmidt@example.de
+Phone: +49 7131 987654
+
+Delivery Address: Allee 12, 74076 Heilbronn
+Description: Urgent delivery needed for event tomorrow. Please handle with care.
+
+Items:
+  10x Product X
+  1x Product Y
+
+Priority: NORMAL
+Assigned Driver: Driver Slot 2
+Driver Status: unassigned
+Proof Required: Photo + signature required upon delivery
+Delivery Window: 2025-11-23 13:14 to 2025-11-24 01:14

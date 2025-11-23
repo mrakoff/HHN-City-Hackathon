@@ -1,0 +1,71 @@
+✅ METHOD 1 — Create a Google Maps URL using OSRM geometry (recommended)
+
+OSRM returns a route like this:
+
+"routes": [
+  {
+    "geometry": "encoded_polyline_string",
+    "legs": [ ... ],
+    "distance": 12345,
+    "duration": 900
+  }
+]
+
+Step 1 — Decode OSRM polyline
+
+Using Python:
+
+import polyline
+
+coords = polyline.decode(osrm_polyline)  # returns [(lat, lon), ...]
+
+Step 2 — Convert coordinates into Google Maps waypoint format
+
+Google Maps URL format:
+
+https://www.google.com/maps/dir/?api=1&origin=LAT1,LON1&destination=LATn,LONn&waypoints=LAT2,LON2|LAT3,LON3|...
+
+Example code:
+import urllib.parse
+
+origin = f"{coords[0][0]},{coords[0][1]}"
+destination = f"{coords[-1][0]},{coords[-1][1]}"
+
+# Limit waypoints to avoid Google limit (~23)
+waypoints_list = coords[1:-1][:20]
+waypoints = "|".join([f"{lat},{lon}" for (lat, lon) in waypoints_list])
+
+google_url = (
+    "https://www.google.com/maps/dir/?api=1"
+    f"&origin={urllib.parse.quote(origin)}"
+    f"&destination={urllib.parse.quote(destination)}"
+    f"&waypoints={urllib.parse.quote(waypoints)}"
+)
+print(google_url)
+
+
+Paste the generated URL into a browser → Google Maps navigation starts immediately.
+
+⚠️ Important Notes
+1️⃣ Google Maps has waypoint limits
+
+Free navigation supports up to ~23 waypoints.
+If OSRM gives 100+ coordinates, you must reduce them (sample every Nth point).
+
+2️⃣ Use "overview polyline," not every maneuver point
+
+OSRM’s geometry already describes the whole route.
+You do NOT need to use each turn-by-turn node.
+
+3️⃣ Ensure order is correct
+
+OSRM gives points in the correct navigation order → so Google Maps follows the same path (mostly).
+
+🟦 Example end result URL
+
+It will look like:
+
+https://www.google.com/maps/dir/?api=1&origin=48.7801,9.1829&destination=48.7572,9.2031&waypoints=48.7765,9.1856|48.7701,9.1923|48.7655,9.1977
+
+
+Click → Google Maps opens → Start Navigation.

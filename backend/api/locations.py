@@ -113,3 +113,14 @@ def delete_parking_location(parking_id: int, db: Session = Depends(get_db)):
     db.delete(parking)
     db.commit()
     return {"message": "Parking location deleted successfully"}
+
+
+@router.delete("/parking")
+def delete_all_parking_locations(db: Session = Depends(get_db)):
+    """Delete all parking locations (keep only depots)"""
+    deleted_count = db.query(ParkingLocation).delete()
+    db.commit()
+    return {
+        "message": f"Deleted {deleted_count} parking location(s)",
+        "deleted_count": deleted_count
+    }

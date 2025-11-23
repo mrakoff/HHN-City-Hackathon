@@ -5,18 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Route Planning - Planner Dashboard</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="routes-ui.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Route Planning Dashboard</h1>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="nav-collapse-btn" id="nav-collapse-btn" title="Toggle Navigation">
+                    <span class="collapse-icon">◀</span>
+                </button>
+                <h1>Route Planning Dashboard</h1>
+            </div>
             <nav class="tabs">
-                <button class="tab-btn active" data-tab="orders">Orders (1)</button>
-                <button class="tab-btn" data-tab="drivers">Drivers (2)</button>
-                <button class="tab-btn" data-tab="routes">Routes (3)</button>
-                <button class="tab-btn" data-tab="locations">Locations (4)</button>
+                <button class="tab-btn active" data-tab="orders" data-icon="📦" title="Orders"><span>Orders</span></button>
+                <button class="tab-btn" data-tab="routes" data-icon="🛣️" title="Routes"><span>Routes</span></button>
+                <button class="tab-btn" data-tab="drivers" data-icon="👥" title="Drivers"><span>Drivers</span></button>
+                <button class="tab-btn" data-tab="summary" data-icon="📊" title="Summary"><span>Summary</span></button>
+                <button class="tab-btn" data-tab="archive" data-icon="📚" title="Archive"><span>Archive</span></button>
+
+                <!-- Route-specific controls (only visible on routes tab) -->
+                <div class="route-header-controls" id="route-header-controls" style="display: none;">
+                    <button class="btn-icon" id="add-orders-btn" title="Add Orders">+</button>
+                    <button class="btn btn-secondary" id="depots-btn" title="View Depots">🏢 Depots</button>
+                    <button class="btn-icon" id="date-prev" title="Previous Day">‹</button>
+                    <div id="date-selector" class="date-selector">
+                        <span id="current-date">Sun, Nov 23</span>
+                    </div>
+                    <button class="btn-icon" id="date-next" title="Next Day">›</button>
+                    <button class="btn-icon" id="search-btn" title="Search">🔍</button>
+                    <button class="btn-icon" id="undo-btn" title="Undo">↶</button>
+                    <button class="btn-icon" id="redo-btn" title="Redo">↷</button>
+                    <button class="btn btn-primary" id="plan-routes-btn">Plan Routes</button>
+                </div>
+
                 <button class="btn btn-secondary" onclick="window.open('help.html', '_blank')" style="margin-left: auto;">Help</button>
             </nav>
         </header>
@@ -32,9 +56,15 @@
                 </div>
             </div>
 
-            <div class="order-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd;">
-                <button class="order-tab-btn active" onclick="switchOrderView('all')" data-view="all">All Orders</button>
-                <button class="order-tab-btn" onclick="switchOrderView('unfinished')" data-view="unfinished">Unfinished Orders</button>
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; align-items: center;">
+                <button class="stat-pill active" id="all-orders-pill" onclick="switchOrderView('all')" data-view="all">
+                    <span>Orders</span>
+                    <span id="all-orders-count">0</span>
+                </button>
+                <button class="stat-pill" id="unfinished-orders-pill" onclick="switchOrderView('unfinished')" data-view="unfinished">
+                    <span>Unfinished Orders</span>
+                    <span id="unfinished-orders-count">0</span>
+                </button>
             </div>
 
             <div class="filters">
@@ -68,13 +98,83 @@
 
         <!-- Routes Tab -->
         <div id="routes-tab" class="tab-content">
-            <div class="section-header">
-                <h2>Route Planning</h2>
-                <button class="btn btn-primary" onclick="showCreateRouteModal()">+ Create Route</button>
+
+            <!-- Statistics Bar -->
+            <div class="statistics-bar">
+                <div class="stat-item">
+                    <span class="stat-icon">👤</span>
+                    <span class="stat-label">Drivers</span>
+                    <span class="stat-value" id="stat-drivers">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📦</span>
+                    <span class="stat-label">Packages</span>
+                    <span class="stat-value" id="stat-packages">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🛣️</span>
+                    <span class="stat-label">Distance</span>
+                    <span class="stat-value" id="stat-distance">0km</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-label">Time</span>
+                    <span class="stat-value" id="stat-time">0h 0m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🏢</span>
+                    <span class="stat-label">Depots</span>
+                    <span class="stat-value" id="stat-depots">1</span>
+                </div>
+                <div class="stat-item" id="stat-stops" style="display: none;">
+                    <span class="stat-icon">📍</span>
+                    <span class="stat-label">Stops</span>
+                    <span class="stat-value" id="stat-stops-value">0</span>
+                </div>
+                <div class="stat-item" id="stat-routing" style="display: none;">
+                    <span class="stat-label" id="stat-routing-label">🛣️ Real roads</span>
+                </div>
             </div>
-            <div id="routes-list" class="routes-list"></div>
-            <div id="route-map-container" class="map-container">
-                <div id="route-map"></div>
+
+            <!-- Main Content Area -->
+            <div class="routes-main-content">
+                <!-- Left Panel: Routes List -->
+                <div class="routes-list-panel" id="routes-list-panel">
+                    <div class="routes-panel-header">
+                        <div class="routes-panel-title">
+                            <button class="collapse-btn" id="routes-panel-toggle" title="Toggle Routes Panel">
+                                <span class="collapse-icon">◀</span>
+                            </button>
+                            <h3>Routes</h3>
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="timeline" title="Timeline View">📅</button>
+                        </div>
+                    </div>
+                    <div id="routes-list-container" class="routes-list-container">
+                        <!-- Routes will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Timeline View (shown when 📅 button is clicked) -->
+                <div class="routes-timeline-view" id="routes-timeline-view" style="display: none;">
+                    <div class="timeline-view-header">
+                        <h3>Route Timeline</h3>
+                        <button class="collapse-btn" id="timeline-collapse-btn" title="Collapse Timeline">
+                            <span class="collapse-icon">▶</span>
+                        </button>
+                    </div>
+                    <div id="timeline-view-content" class="timeline-view-content">
+                        <!-- Timeline stops will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Center: Map -->
+                <div class="routes-map-panel" id="routes-map-panel">
+                    <div id="route-map-container" class="map-container">
+                        <div id="route-map"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -98,6 +198,133 @@
                 </div>
             </div>
         </div>
+
+        <!-- Summary Tab -->
+        <div id="summary-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Dashboard Summary</h2>
+                <button class="btn btn-secondary" onclick="refreshSummary()">🔄 Refresh</button>
+            </div>
+
+            <!-- Key Metrics Cards -->
+            <div class="summary-metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">📦</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Total Orders</div>
+                        <div class="metric-value" id="metric-total-orders">-</div>
+                        <div class="metric-change" id="metric-orders-change">-</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">✅</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Completed</div>
+                        <div class="metric-value" id="metric-completed">-</div>
+                        <div class="metric-change" id="metric-completed-change">-</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🚚</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Active Routes</div>
+                        <div class="metric-value" id="metric-active-routes">-</div>
+                        <div class="metric-change" id="metric-routes-change">-</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">👥</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Active Drivers</div>
+                        <div class="metric-value" id="metric-active-drivers">-</div>
+                        <div class="metric-change" id="metric-drivers-change">-</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⏱️</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Avg Delivery Time</div>
+                        <div class="metric-value" id="metric-avg-time">-</div>
+                        <div class="metric-change" id="metric-time-change">-</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📈</div>
+                    <div class="metric-content">
+                        <div class="metric-label">Success Rate</div>
+                        <div class="metric-value" id="metric-success-rate">-</div>
+                        <div class="metric-change" id="metric-success-change">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="summary-charts-grid">
+                <div class="chart-card">
+                    <h3>Orders by Status</h3>
+                    <div id="status-chart" class="chart-container">
+                        <canvas id="status-chart-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Orders by Source</h3>
+                    <div id="source-chart" class="chart-container">
+                        <canvas id="source-chart-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Daily Delivery Trend</h3>
+                    <div id="trend-chart" class="chart-container">
+                        <canvas id="trend-chart-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Priority Distribution</h3>
+                    <div id="priority-chart" class="chart-container">
+                        <canvas id="priority-chart-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="summary-activity">
+                <h3>Recent Activity</h3>
+                <div id="recent-activity-list" class="activity-list"></div>
+            </div>
+        </div>
+
+        <!-- Archive Tab -->
+        <div id="archive-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Delivery Archive</h2>
+                <div class="actions">
+                    <select id="archive-filter-status" onchange="loadArchive()" class="filter-select">
+                        <option value="">All Statuses</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <input type="date" id="archive-filter-date" onchange="loadArchive()" class="filter-select">
+                    <button class="btn btn-secondary" onclick="loadArchive()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div class="archive-stats-bar">
+                <div class="archive-stat">
+                    <span class="archive-stat-label">Total Archived</span>
+                    <span class="archive-stat-value" id="archive-total">0</span>
+                </div>
+                <div class="archive-stat">
+                    <span class="archive-stat-label">This Month</span>
+                    <span class="archive-stat-value" id="archive-month">0</span>
+                </div>
+                <div class="archive-stat">
+                    <span class="archive-stat-label">This Week</span>
+                    <span class="archive-stat-value" id="archive-week">0</span>
+                </div>
+            </div>
+
+            <div id="archive-list" class="archive-list"></div>
+        </div>
     </div>
 
     <!-- Modals -->
@@ -108,6 +335,8 @@
         </div>
     </div>
 
+    <script src="../shared/config.js"></script>
+    <script src="../shared/apiClient.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

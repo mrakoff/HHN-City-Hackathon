@@ -5,6 +5,7 @@ This script will:
 1. Clear existing data (optional)
 2. Create fresh sample data with valid coordinates in Baden-Württemberg
 3. Ensure all orders have coordinates for OSRM routing
+4. Parking locations are now dynamically generated using OSRM (no static parking locations)
 
 Run: python3 scripts/reset_and_setup_database.py
 """
@@ -63,51 +64,6 @@ DEPOTS = [
         "address": "Hauptbahnhof 1, 70173 Stuttgart, Germany",
         "latitude": 48.7833,
         "longitude": 9.1817
-    }
-]
-
-PARKING_LOCATIONS = [
-    {
-        "name": "Parking Königstraße",
-        "address": "Königstraße 50, 70173 Stuttgart, Germany",
-        "latitude": 48.7784,
-        "longitude": 9.1829,
-        "notes": "Near Königstraße shopping area"
-    },
-    {
-        "name": "Parking Schlossplatz",
-        "address": "Schlossplatz 1, 70173 Stuttgart, Germany",
-        "latitude": 48.7784,
-        "longitude": 9.1829,
-        "notes": "Central Stuttgart parking"
-    },
-    {
-        "name": "Parking Marienplatz",
-        "address": "Marienplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7758,
-        "longitude": 9.1829,
-        "notes": "Near Marienplatz"
-    },
-    {
-        "name": "Parking Rotebühlplatz",
-        "address": "Rotebühlplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7744,
-        "longitude": 9.1708,
-        "notes": "Near Rotebühlplatz"
-    },
-    {
-        "name": "Parking Feuersee",
-        "address": "Feuerseeplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7700,
-        "longitude": 9.1700,
-        "notes": "Near Feuersee area"
-    },
-    {
-        "name": "Parking Bad Cannstatt",
-        "address": "Marktstraße 1, 70372 Stuttgart, Germany",
-        "latitude": 48.8083,
-        "longitude": 9.2200,
-        "notes": "Bad Cannstatt parking"
     }
 ]
 
@@ -293,7 +249,6 @@ def reset_and_setup_database(clear_existing=False):
     results = {
         "drivers": 0,
         "depots": 0,
-        "parking": 0,
         "orders": 0,
         "routes": 0
     }
@@ -304,7 +259,8 @@ def reset_and_setup_database(clear_existing=False):
             db.query(RouteOrder).delete()
             db.query(Route).delete()
             db.query(Order).delete()
-            db.query(ParkingLocation).delete()
+            # Note: ParkingLocation deletion is optional - existing static parking
+            # locations will remain but won't be used if dynamic parking is available
             db.query(Depot).delete()
             db.query(Driver).delete()
             db.commit()
@@ -336,20 +292,8 @@ def reset_and_setup_database(clear_existing=False):
             results["depots"] += 1
             print(f"  ✅ Added depot: {depot_data['name']} at ({depot_data['latitude']}, {depot_data['longitude']})")
 
-        # Add parking locations
-        print("\n🅿️  Adding parking locations...")
-        for parking_data in PARKING_LOCATIONS:
-            existing = db.query(ParkingLocation).filter(
-                ParkingLocation.name == parking_data["name"]
-            ).first()
-            if existing:
-                print(f"  ⚠️  Parking {parking_data['name']} already exists, skipping")
-                continue
-
-            parking = ParkingLocation(**parking_data)
-            db.add(parking)
-            results["parking"] += 1
-            print(f"  ✅ Added parking: {parking_data['name']} at ({parking_data['latitude']}, {parking_data['longitude']})")
+        # Note: Parking locations are now dynamically generated using OSRM
+        # No static parking locations are created
 
         # Add orders
         print("\n📋 Adding orders...")
@@ -379,10 +323,11 @@ def reset_and_setup_database(clear_existing=False):
         print(f"\nSummary:")
         print(f"  - Drivers: {results['drivers']} added")
         print(f"  - Depots: {results['depots']} added")
-        print(f"  - Parking locations: {results['parking']} added")
         print(f"  - Orders: {results['orders']} added")
         print(f"\n📍 All coordinates are in Baden-Württemberg (Stuttgart region)")
         print(f"   Compatible with OSRM routing!")
+        print(f"\nNote: Parking locations are dynamically generated using OSRM")
+        print(f"      when routes are optimized.")
         print("\nYou can now create routes and optimize them!")
 
     except Exception as e:

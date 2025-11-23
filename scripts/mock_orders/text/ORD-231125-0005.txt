@@ -1,0 +1,12 @@
+Order #ORD-231125-0005
+David Schneider
+Phone: +49 7131 345678
+Kaiserstraße 78, 74072 Heilbronn
+
+Items:
+  2 Box Set A
+  2 Box Set B
+
+Priority: None
+Driver: Driver Slot 5 (unassigned)
+Proof Required: Photo + signature required upon delivery

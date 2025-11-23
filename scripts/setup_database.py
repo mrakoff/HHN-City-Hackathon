@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Setup script to populate the database with sample data for routing.
-Creates drivers, depots, parking locations, and sample orders.
+Creates drivers, depots, and sample orders.
+Parking locations are now dynamically generated using OSRM.
 Run this from the project root directory with: python3 scripts/setup_database.py
 """
 
@@ -14,7 +15,7 @@ project_root = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(project_root))
 
 try:
-    from backend.database import SessionLocal, Driver, Depot, ParkingLocation, Order
+    from backend.database import SessionLocal, Driver, Depot, Order
 except ImportError as e:
     print(f"Error importing backend modules: {e}")
     print("Make sure you're running this from the project root and dependencies are installed.")
@@ -62,51 +63,6 @@ DEPOTS = [
         "address": "Hauptbahnhof 1, 70173 Stuttgart, Germany",
         "latitude": 48.7833,
         "longitude": 9.1817
-    }
-]
-
-PARKING_LOCATIONS = [
-    {
-        "name": "Parking Königstraße",
-        "address": "Königstraße 50, 70173 Stuttgart, Germany",
-        "latitude": 48.7784,
-        "longitude": 9.1829,
-        "notes": "Near Königstraße shopping area"
-    },
-    {
-        "name": "Parking Schlossplatz",
-        "address": "Schlossplatz 1, 70173 Stuttgart, Germany",
-        "latitude": 48.7784,
-        "longitude": 9.1829,
-        "notes": "Central Stuttgart parking"
-    },
-    {
-        "name": "Parking Marienplatz",
-        "address": "Marienplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7758,
-        "longitude": 9.1829,
-        "notes": "Near Marienplatz"
-    },
-    {
-        "name": "Parking Rotebühlplatz",
-        "address": "Rotebühlplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7744,
-        "longitude": 9.1708,
-        "notes": "Near Rotebühlplatz"
-    },
-    {
-        "name": "Parking Feuersee",
-        "address": "Feuerseeplatz 1, 70178 Stuttgart, Germany",
-        "latitude": 48.7700,
-        "longitude": 9.1700,
-        "notes": "Near Feuersee area"
-    },
-    {
-        "name": "Parking Bad Cannstatt",
-        "address": "Marktstraße 1, 70372 Stuttgart, Germany",
-        "latitude": 48.8083,
-        "longitude": 9.2200,
-        "notes": "Bad Cannstatt parking"
     }
 ]
 
@@ -291,23 +247,32 @@ def setup_database():
     results = {
         "drivers": 0,
         "depots": 0,
-        "parking": 0,
         "orders": 0
     }
 
     try:
+        created_drivers = []
+
         # Add drivers
         print("\n📦 Adding drivers...")
-        for driver_data in DRIVERS:
+        for idx, driver_data in enumerate(DRIVERS):
             existing = db.query(Driver).filter(Driver.name == driver_data["name"]).first()
             if existing:
+                if not existing.access_code:
+                    existing.access_code = f"DRV-{idx + 1:04d}"
+                    db.flush()
                 print(f"  ⚠️  Driver {driver_data['name']} already exists")
+                created_drivers.append(existing)
                 continue
 
-            driver = Driver(**driver_data)
+            driver_payload = dict(driver_data)
+            driver_payload.setdefault("access_code", f"DRV-{idx + 1:04d}")
+            driver = Driver(**driver_payload)
             db.add(driver)
+            db.flush()
+            created_drivers.append(driver)
             results["drivers"] += 1
-            print(f"  ✅ Added driver: {driver_data['name']}")
+            print(f"  ✅ Added driver: {driver_data['name']} (token {driver.access_code})")
 
         # Add depots
         print("\n🏭 Adding depots...")
@@ -322,24 +287,12 @@ def setup_database():
             results["depots"] += 1
             print(f"  ✅ Added depot: {depot_data['name']}")
 
-        # Add parking locations
-        print("\n🅿️  Adding parking locations...")
-        for parking_data in PARKING_LOCATIONS:
-            existing = db.query(ParkingLocation).filter(
-                ParkingLocation.name == parking_data["name"]
-            ).first()
-            if existing:
-                print(f"  ⚠️  Parking {parking_data['name']} already exists")
-                continue
-
-            parking = ParkingLocation(**parking_data)
-            db.add(parking)
-            results["parking"] += 1
-            print(f"  ✅ Added parking: {parking_data['name']}")
+        # Note: Parking locations are now dynamically generated using OSRM
+        # No static parking locations are created
 
         # Add orders
         print("\n📋 Adding orders...")
-        for order_data in ORDERS:
+        for idx, order_data in enumerate(ORDERS):
             existing = db.query(Order).filter(
                 Order.order_number == order_data["order_number"]
             ).first()
@@ -347,10 +300,35 @@ def setup_database():
                 print(f"  ⚠️  Order {order_data['order_number']} already exists")
                 continue
 
-            order = Order(**order_data)
+            order_payload = dict(order_data)
+            assigned_driver = created_drivers[idx % len(created_drivers)] if created_drivers else None
+            if assigned_driver:
+                order_payload["assigned_driver_id"] = assigned_driver.id
+                order_payload["driver_status"] = "assigned"
+                order_payload["status"] = "assigned"
+            else:
+                order_payload["driver_status"] = "unassigned"
+                order_payload["status"] = order_payload.get("status") or "pending"
+
+            order_payload["driver_status_updated_at"] = datetime.utcnow()
+            order_payload.setdefault("driver_notes", None)
+            order_payload.setdefault("failure_reason", None)
+            order_payload.setdefault("driver_gps_lat", None)
+            order_payload.setdefault("driver_gps_lng", None)
+            order_payload.setdefault("delivered_at", None)
+            order_payload.setdefault("failed_at", None)
+            order_payload.setdefault("proof_photo_path", None)
+            order_payload.setdefault("proof_signature_path", None)
+            order_payload.setdefault("proof_metadata", None)
+            order_payload.setdefault("proof_captured_at", None)
+
+            order = Order(**order_payload)
             db.add(order)
             results["orders"] += 1
-            print(f"  ✅ Added order: {order_data['order_number']} - {order_data['delivery_address']}")
+            if assigned_driver:
+                print(f"  ✅ Added order: {order_data['order_number']} -> Driver {assigned_driver.name}")
+            else:
+                print(f"  ✅ Added order: {order_data['order_number']} - {order_data['delivery_address']}")
 
         db.commit()
 
@@ -359,8 +337,9 @@ def setup_database():
         print(f"\nSummary:")
         print(f"  - Drivers: {results['drivers']} added")
         print(f"  - Depots: {results['depots']} added")
-        print(f"  - Parking locations: {results['parking']} added")
         print(f"  - Orders: {results['orders']} added")
+        print(f"\nNote: Parking locations are dynamically generated using OSRM")
+        print("      when routes are optimized.")
         print("\nYou can now create routes and optimize them!")
 
     except Exception as e:
