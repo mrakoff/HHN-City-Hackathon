@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HHN City Logistics – Book a Delivery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__content">
+        <p class="hero__eyebrow">HHN City Logistics</p>
+        <h1>Send your parcels across the city in just a few clicks.</h1>
+        <p class="hero__subtext">
+          Provide your delivery details and we will route the closest courier.
+          Every order is geocoded automatically, so you can keep it simple.
+        </p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card card--form">
+        <h2>Create a delivery order</h2>
+        <p class="card__lead">
+          Tell us where the parcel should go and how we can reach you. The more
+          context you share, the easier it is for the driver to succeed on the
+          first try.
+        </p>
+
+        <div class="voice-input-section">
+          <button
+            type="button"
+            id="voice-input-btn"
+            class="button button--voice"
+            aria-label="Start voice input"
+          >
+            <span class="voice-btn-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 14C13.1 14 14 13.1 14 12V6C14 4.9 13.1 4 12 4C10.9 4 10 4.9 10 6V12C10 13.1 10.9 14 12 14Z"/>
+                <path d="M19 10V12C19 15.9 15.9 19 12 19C8.1 19 5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12V10H19Z"/>
+                <path d="M11 22H13V20H11V22Z"/>
+                <path d="M7 22H17V20H7V22Z"/>
+              </svg>
+            </span>
+            <span class="voice-btn-text">Use Voice Input</span>
+          </button>
+          <div id="voice-status" class="voice-status voice-status--hidden"></div>
+        </div>
+
+        <div
+          id="form-messages"
+          class="alert alert--hidden"
+          role="status"
+          aria-live="polite"
+        ></div>
+
+        <form id="order-form" novalidate>
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Customer name</span>
+              <input
+                type="text"
+                name="customer_name"
+                placeholder="e.g. Jane Doe"
+                autocomplete="name"
+              />
+            </label>
+
+            <label class="form-field">
+              <span>Phone number</span>
+              <input
+                type="tel"
+                name="customer_phone"
+                placeholder="+49 123 456789"
+                autocomplete="tel"
+              />
+            </label>
+
+            <label class="form-field">
+              <span>Email address</span>
+              <input
+                type="email"
+                name="customer_email"
+                placeholder="you@example.com"
+                autocomplete="email"
+              />
+            </label>
+          </div>
+
+          <label class="form-field">
+            <span>Delivery address *</span>
+            <textarea
+              name="delivery_address"
+              rows="3"
+              required
+              placeholder="Street, number, postal code, city"
+              autocomplete="street-address"
+            ></textarea>
+            <small>The system geocodes the address for you.</small>
+          </label>
+
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Time window start</span>
+              <input
+                type="datetime-local"
+                name="delivery_time_window_start"
+              />
+            </label>
+
+            <label class="form-field">
+              <span>Time window end</span>
+              <input type="datetime-local" name="delivery_time_window_end" />
+            </label>
+          </div>
+
+          <label class="form-field">
+            <span>Delivery instructions</span>
+            <textarea
+              name="description"
+              rows="4"
+              placeholder="Entrance code, safe drop-off, package details..."
+            ></textarea>
+          </label>
+
+          <button type="submit" class="button" data-variant="primary">
+            Submit order
+          </button>
+        </form>
+      </section>
+
+      <section class="card card--info">
+        <h3>How it works</h3>
+        <ul>
+          <li>Submit your request on this page.</li>
+          <li>We automatically geocode and validate every order.</li>
+          <li>Our dispatch team assigns the best available driver.</li>
+          <li>You receive updates from our operations lead if needed.</li>
+        </ul>
+        <p class="card__footnote">
+          Need to move multiple parcels? Reach out via
+          <a href="mailto:operations@hhn-city.example">operations@hhn-city.example</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>© <span id="copyright-year"></span> HHN City Logistics.</p>
+      <p>Dispatch hotline: +49 731 555 1234</p>
+    </footer>
+
+    <script src="app.js" defer></script>
+    <noscript>
+      <div class="alert">
+        This page needs JavaScript to submit your order. Please enable it and
+        try again.
+      </div>
+    </noscript>
+  </body>
+</html>

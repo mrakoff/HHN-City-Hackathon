@@ -1,0 +1,20 @@
+ORDER FORM
+
+Order Number: ORD-231125-0001
+Customer Name: Thomas Müller
+Email: thomas.mueller@example.de
+Phone: +49 7131 123456
+
+Delivery Address: Kiliansplatz 1, 74072 Heilbronn
+Description: Standard delivery for office supplies. Please deliver during business hours.
+
+Items:
+  5x Widget A
+  3x Widget B
+  2x Widget C
+
+Priority: NORMAL
+Assigned Driver: Driver Slot 1
+Driver Status: unassigned
+Proof Required: Photo + signature required upon delivery
+Delivery Window: 2025-11-24 01:14 to 2025-11-25 01:14

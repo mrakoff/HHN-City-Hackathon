@@ -26,15 +26,15 @@ except ImportError:
     print("Warning: Pillow not available. Image generation will be skipped.")
 
 
-# Sample order data with German locations
+# Sample order data with Heilbronn locations
 # Order numbers are generated in format ORD-ddmmyy-XXXX
 MOCK_ORDERS = [
     {
         "order_number": None,  # Will be generated as ORD-ddmmyy-0001
         "customer_name": "Thomas Müller",
         "customer_email": "thomas.mueller@example.de",
-        "customer_phone": "+49 30 12345678",
-        "delivery_address": "Hauptstraße 123, 10115 Berlin",
+        "customer_phone": "+49 7131 123456",
+        "delivery_address": "Kiliansplatz 1, 74072 Heilbronn",
         "description": "Standard delivery for office supplies. Please deliver during business hours.",
         "items": [
             {"name": "Widget A", "quantity": 5},
@@ -50,8 +50,8 @@ MOCK_ORDERS = [
         "order_number": None,  # Will be generated as ORD-ddmmyy-0002
         "customer_name": "Maria Schmidt",
         "customer_email": "maria.schmidt@example.de",
-        "customer_phone": "+49 89 98765432",
-        "delivery_address": "Marienplatz 8, 80331 München",
+        "customer_phone": "+49 7131 987654",
+        "delivery_address": "Allee 12, 74076 Heilbronn",
         "description": "Urgent delivery needed for event tomorrow. Please handle with care.",
         "items": [
             {"name": "Product X", "quantity": 10},
@@ -66,8 +66,8 @@ MOCK_ORDERS = [
         "order_number": None,  # Will be generated as ORD-ddmmyy-0003
         "customer_name": "Robert Fischer",
         "customer_email": None,
-        "customer_phone": "+49 40 55512345",
-        "delivery_address": "Speicherstadt 1, 20457 Hamburg",
+        "customer_phone": "+49 7131 555123",
+        "delivery_address": "Crailsheimstraße 45, 74074 Heilbronn",
         "description": "No specific delivery time required. Standard shipping.",
         "items": [
             {"name": "Item 1", "quantity": 4},
@@ -83,8 +83,8 @@ MOCK_ORDERS = [
         "order_number": None,  # Will be generated as ORD-ddmmyy-0004 (FAX source)
         "customer_name": "Lisa Weber",
         "customer_email": "lisa.weber@example.de",
-        "customer_phone": "+49 69 23456789",
-        "delivery_address": "Zeil 45, 60313 Frankfurt am Main",
+        "customer_phone": "+49 7131 234567",
+        "delivery_address": "Willy-Brandt-Platz 2, 74072 Heilbronn",
         "description": "Bulk order for warehouse. Delivery window: 3-4 days from now.",
         "items": [
             {"name": "Component A", "quantity": 8}
@@ -98,8 +98,8 @@ MOCK_ORDERS = [
         "order_number": None,  # Will be generated as ORD-ddmmyy-0005 (MAIL source)
         "customer_name": "David Schneider",
         "customer_email": "d.schneider@example.de",
-        "customer_phone": "+49 221 34567890",
-        "delivery_address": "Hohe Straße 78, 50667 Köln",
+        "customer_phone": "+49 7131 345678",
+        "delivery_address": "Kaiserstraße 78, 74072 Heilbronn",
         "description": "Regular order, no rush. Deliver when convenient.",
         "items": [
             {"name": "Box Set A", "quantity": 2},
@@ -111,6 +111,12 @@ MOCK_ORDERS = [
         "format": "poorly_formatted"
     }
 ]
+
+for idx, order in enumerate(MOCK_ORDERS):
+    order.setdefault("assigned_driver_name", f"Driver Slot {idx + 1}")
+    order.setdefault("driver_status", "unassigned")
+    order.setdefault("driver_notes", "")
+    order.setdefault("proof_requirements", "Photo + signature required upon delivery")
 
 
 def create_pdf_order(order: Dict, output_dir: Path, format_type: str = "well_formatted"):
@@ -162,6 +168,12 @@ def create_pdf_order(order: Dict, output_dir: Path, format_type: str = "well_for
             y_pos -= 20
 
         y_pos -= 10
+        c.drawString(72, y_pos, f"Assigned Driver: {order.get('assigned_driver_name', 'N/A')}")
+        y_pos -= 20
+        c.drawString(72, y_pos, f"Driver Status: {order.get('driver_status', 'unassigned')}")
+        y_pos -= 20
+        c.drawString(72, y_pos, f"Proof Required: {order.get('proof_requirements', 'Photo + signature')}")
+        y_pos -= 20
         priority = order.get('priority') or 'normal'
         c.drawString(72, y_pos, f"Priority: {priority.upper()}")
 
@@ -187,6 +199,8 @@ Items:
 
         priority = order.get('priority') or 'normal'
         text += f"\nPriority: {priority}"
+        text += f"\nDriver: {order.get('assigned_driver_name', 'N/A')} ({order.get('driver_status', 'unassigned')})"
+        text += f"\nProof Required: {order.get('proof_requirements', 'Photo + signature')}"
 
         # Draw as a block of text (less structured)
         text_lines = text.strip().split('\n')
@@ -259,6 +273,12 @@ def create_image_order(order: Dict, output_dir: Path, format_type: str = "well_f
             y_pos += 30
 
         y_pos += 20
+        draw.text((50, y_pos), f"Assigned Driver: {order.get('assigned_driver_name', 'N/A')}", fill='black', font=font_small)
+        y_pos += 30
+        draw.text((50, y_pos), f"Driver Status: {order.get('driver_status', 'unassigned')}", fill='black', font=font_small)
+        y_pos += 30
+        draw.text((50, y_pos), f"Proof Required: {order.get('proof_requirements', 'Photo + signature')}", fill='black', font=font_small)
+        y_pos += 30
         priority = order.get('priority') or 'normal'
         draw.text((50, y_pos), f"Priority: {priority.upper()}", fill='black', font=font_medium)
 
@@ -284,6 +304,8 @@ def create_image_order(order: Dict, output_dir: Path, format_type: str = "well_f
 
         text_lines.append("")
         text_lines.append(f"Priority: {order.get('priority', 'normal')}")
+        text_lines.append(f"Driver: {order.get('assigned_driver_name', 'N/A')} ({order.get('driver_status', 'unassigned')})")
+        text_lines.append(f"Proof Required: {order.get('proof_requirements', 'Photo + signature')}")
 
         for line in text_lines:
             draw.text((50, y_pos), line, fill='black', font=font_small)
@@ -324,6 +346,9 @@ Items:
 
         priority = order.get('priority') or 'normal'
         text += f"\nPriority: {priority.upper()}\n"
+        text += f"Assigned Driver: {order.get('assigned_driver_name', 'N/A')}\n"
+        text += f"Driver Status: {order.get('driver_status', 'unassigned')}\n"
+        text += f"Proof Required: {order.get('proof_requirements', 'Photo + signature')}\n"
 
         if order.get('delivery_time_window_start'):
             start_str = order['delivery_time_window_start'].strftime("%Y-%m-%d %H:%M")
@@ -341,6 +366,8 @@ Items:
             text += f"  {item['quantity']} {item['name']}\n"
 
         text += f"\nPriority: {order.get('priority', 'normal')}\n"
+        text += f"Driver: {order.get('assigned_driver_name', 'N/A')} ({order.get('driver_status', 'unassigned')})\n"
+        text += f"Proof Required: {order.get('proof_requirements', 'Photo + signature')}\n"
 
     with open(filepath, 'w') as f:
         f.write(text)

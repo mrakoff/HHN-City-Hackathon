@@ -21,8 +21,10 @@ class Driver(Base):
     phone = Column(String)
     email = Column(String)
     status = Column(String, default="available")  # available, on_route, offline
+    access_code = Column(String, unique=True, index=True)  # simple driver auth token
     current_location_lat = Column(Float)
     current_location_lng = Column(Float)
+    last_check_in_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     routes = relationship("Route", back_populates="driver")
@@ -68,13 +70,27 @@ class Order(Base):
     delivery_time_window_end = Column(DateTime)
     priority = Column(String, default="normal")  # low, normal, high, urgent
     status = Column(String, default="pending")  # pending, assigned, in_transit, completed, failed
+    driver_status = Column(String, default="unassigned")  # unassigned, accepted, en_route, delivered, failed
+    failure_reason = Column(Text)
+    driver_notes = Column(Text)
+    driver_status_updated_at = Column(DateTime)
     source = Column(String)  # email, fax, mail, phone
     raw_text = Column(Text)  # Original scanned/parsed text
     validation_errors = Column(JSON)  # List of validation errors
+    assigned_driver_id = Column(Integer, ForeignKey("drivers.id"))
+    driver_gps_lat = Column(Float)
+    driver_gps_lng = Column(Float)
+    delivered_at = Column(DateTime)
+    failed_at = Column(DateTime)
+    proof_photo_path = Column(String)
+    proof_signature_path = Column(String)
+    proof_metadata = Column(JSON)
+    proof_captured_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     route_orders = relationship("RouteOrder", back_populates="order")
+    assigned_driver = relationship("Driver", foreign_keys=[assigned_driver_id])
 
 
 class Route(Base):

@@ -1,0 +1,18 @@
+ORDER FORM
+
+Order Number: ORD-231125-0004
+Customer Name: Lisa Weber
+Email: lisa.weber@example.de
+Phone: +49 7131 234567
+
+Delivery Address: Willy-Brandt-Platz 2, 74072 Heilbronn
+Description: Bulk order for warehouse. Delivery window: 3-4 days from now.
+
+Items:
+  8x Component A
+
+Priority: NORMAL
+Assigned Driver: Driver Slot 4
+Driver Status: unassigned
+Proof Required: Photo + signature required upon delivery
+Delivery Window: 2025-11-26 01:14 to 2025-11-27 01:14

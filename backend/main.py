@@ -58,6 +58,14 @@ if os.path.exists(static_dir):
             return FileResponse(file_path)
         raise HTTPException(status_code=404, detail="Not found")
 
+    @app.get("/routes-ui.css")
+    async def serve_routes_ui_css():
+        """Serve routes-ui.css"""
+        file_path = os.path.join(static_dir, "routes-ui.css")
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+        raise HTTPException(status_code=404, detail="Not found")
+
     @app.get("/help.html")
     async def serve_help():
         """Serve help.html"""
@@ -65,6 +73,26 @@ if os.path.exists(static_dir):
         if os.path.exists(file_path):
             return FileResponse(file_path)
         raise HTTPException(status_code=404, detail="Not found")
+
+driver_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "driver-app")
+if os.path.exists(driver_dir):
+    app.mount("/driver", StaticFiles(directory=driver_dir, html=True), name="driver-app")
+
+# Shared assets (config, API client) used by multiple frontends
+shared_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "shared")
+if os.path.exists(shared_dir):
+    app.mount("/shared", StaticFiles(directory=shared_dir), name="shared-assets")
+
+# Serve standalone customer landing page
+customer_static_dir = os.path.join(
+    os.path.dirname(__file__), "..", "frontend", "customer-landing"
+)
+if os.path.exists(customer_static_dir):
+    app.mount(
+        "/customer",
+        StaticFiles(directory=customer_static_dir, html=True),
+        name="customer-landing",
+    )
 
 
 @app.get("/api/health")

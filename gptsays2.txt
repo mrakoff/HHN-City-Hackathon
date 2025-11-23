@@ -1,0 +1,96 @@
+Option A — Use Overpass API (quickest)
+
+Query Baden-Württemberg for parking-tagged ways:
+
+[out:json][timeout:180];
+(
+  way["parking"](area:3600061477);
+  way["parking:lane"](area:3600061477);
+  way["parking:condition"](area:3600061477);
+  way["street_parking"](area:3600061477);
+  way["parking:left"](area:3600061477);
+  way["parking:right"](area:3600061477);
+  way["parking:both"](area:3600061477);
+);
+out geom;
+
+
+You will receive all street segments where parking exists.
+
+Option B — Parse the .pbf file directly (local, no Overpass limits)
+
+Use Python + pyrosm or osmium:
+
+Example with pyrosm:
+from pyrosm import OSM
+import pandas as pd
+
+osm = OSM("baden-wuerttemberg-latest.osm.pbf")
+roads = osm.get_data_by_custom_criteria(
+    custom_filter={
+        "parking": True,
+        "parking:lane": True,
+        "parking:left": True,
+        "parking:right": True,
+        "parking:both": True,
+        "street_parking": True
+    },
+    filter_type="keep",
+    keep_nodes=True,
+    keep_ways=True,
+    keep_relations=False
+)
+
+roads = roads.to_crs(4326)
+print(roads.head())
+
+
+This gives you all street parking-annotated ways, including tags and geometry.
+
+✔️ Step 2 — Convert segments into parking points
+
+OSM gives parking on street segments, not per space.
+So you generate points along them:
+
+import shapely.geometry as geom
+parking_points = []
+
+for _, row in roads.iterrows():
+    line = row.geometry
+    length_m = line.length * 100000  # approx
+    steps = max(1, int(length_m / 10))  # point every 10 m
+    for i in range(steps+1):
+        pt = line.interpolate(i/steps, normalized=True)
+        parking_points.append((pt.y, pt.x))  # lat, lon
+
+
+Now you have usable parking locations, not in OSRM but from raw OSM.
+
+✔️ Step 3 — Combine parking data WITH OSRM routing
+
+Use OSRM only for:
+
+driving distances between parking points
+
+ETA calculations
+
+route reconstruction
+
+Example OSRM call:
+
+/route/v1/driving/{lon},{lat};{lon},{lat}
+
+🔧 If you want to integrate it into your current OSRM setup:
+You CANNOT get parking from OSRM
+
+but you CAN:
+
+Host OSRM (you already have this)
+
+Extract parking from the same .pbf file using osmium, pyrosm, or Overpass
+
+Store parking candidates in PostGIS / GeoJSON / local DB
+
+Query OSRM for routing between chosen parking points
+
+Solve optimization (optional) with OR-Tools

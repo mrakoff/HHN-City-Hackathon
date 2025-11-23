@@ -11,7 +11,7 @@ class DriverBase(BaseModel):
 
 
 class DriverCreate(DriverBase):
-    pass
+    access_code: Optional[str] = None
 
 
 class DriverUpdate(BaseModel):
@@ -21,6 +21,7 @@ class DriverUpdate(BaseModel):
     status: Optional[str] = None
     current_location_lat: Optional[float] = None
     current_location_lng: Optional[float] = None
+    access_code: Optional[str] = None
 
 
 class Driver(DriverBase):
@@ -28,6 +29,8 @@ class Driver(DriverBase):
     status: str
     current_location_lat: Optional[float] = None
     current_location_lng: Optional[float] = None
+    access_code: Optional[str] = None
+    last_check_in_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:
@@ -94,6 +97,21 @@ class OrderCreate(OrderBase):
     priority: Optional[str] = None  # Will be auto-set based on time window
     source: Optional[str] = None
     raw_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    assigned_driver_id: Optional[int] = None
+    driver_status: Optional[str] = None
+    driver_notes: Optional[str] = None
+    failure_reason: Optional[str] = None
+    driver_status_updated_at: Optional[datetime] = None
+    driver_gps_lat: Optional[float] = None
+    driver_gps_lng: Optional[float] = None
+    delivered_at: Optional[datetime] = None
+    failed_at: Optional[datetime] = None
+    proof_photo_path: Optional[str] = None
+    proof_signature_path: Optional[str] = None
+    proof_metadata: Optional[Dict[str, Any]] = None
+    proof_captured_at: Optional[datetime] = None
 
 
 class OrderUpdate(BaseModel):
@@ -109,6 +127,19 @@ class OrderUpdate(BaseModel):
     status: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    assigned_driver_id: Optional[int] = None
+    driver_status: Optional[str] = None
+    driver_notes: Optional[str] = None
+    failure_reason: Optional[str] = None
+    driver_status_updated_at: Optional[datetime] = None
+    driver_gps_lat: Optional[float] = None
+    driver_gps_lng: Optional[float] = None
+    delivered_at: Optional[datetime] = None
+    failed_at: Optional[datetime] = None
+    proof_photo_path: Optional[str] = None
+    proof_signature_path: Optional[str] = None
+    proof_metadata: Optional[Dict[str, Any]] = None
+    proof_captured_at: Optional[datetime] = None
 
 
 class Order(OrderBase):
@@ -124,6 +155,19 @@ class Order(OrderBase):
     validation_errors: Optional[List[str]] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    assigned_driver_id: Optional[int] = None
+    driver_status: Optional[str] = None
+    driver_notes: Optional[str] = None
+    failure_reason: Optional[str] = None
+    driver_status_updated_at: Optional[datetime] = None
+    driver_gps_lat: Optional[float] = None
+    driver_gps_lng: Optional[float] = None
+    delivered_at: Optional[datetime] = None
+    failed_at: Optional[datetime] = None
+    proof_photo_path: Optional[str] = None
+    proof_signature_path: Optional[str] = None
+    proof_metadata: Optional[Dict[str, Any]] = None
+    proof_captured_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -139,6 +183,7 @@ class RouteBase(BaseModel):
 
 class RouteCreate(RouteBase):
     driver_id: int
+    order_ids: Optional[List[int]] = None
 
 
 class RouteUpdate(BaseModel):
@@ -189,7 +234,34 @@ class DriverUpdateResponse(BaseModel):
         from_attributes = True
 
 
+class DriverOrderAssignment(BaseModel):
+    route_id: Optional[int] = None
+    route_order_id: Optional[int] = None
+    route_sequence: Optional[int] = None
+    route_status: Optional[str] = None
+    order: Order
+
+
+class DriverStatusUpdateRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+    failure_reason: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lng: Optional[float] = None
+
+
 # Phone Call / Text Parsing Models
 class ParseTextRequest(BaseModel):
     text: str
     source: str = "phone"
+
+
+# Route Planning Models
+class PlanRoutesRequest(BaseModel):
+    date: Optional[str] = None  # ISO date string
+    max_distance_km: float = 10.0
+    min_orders_per_route: int = 3
+    max_orders_per_route: int = 40
+    driver_ids: Optional[List[int]] = None
+    clustering_method: str = "dbscan"  # "dbscan" or "kmeans"
+    assignment_strategy: str = "balanced"  # "balanced" or "sequential"

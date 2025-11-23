@@ -1,0 +1,935 @@
+/* ==================== MODERN ROUTE PLANNING UI STYLES ==================== */
+
+:root {
+    --bg-primary: #131320;
+    --bg-secondary: #131d44;
+    --bg-tertiary: #143b6d;
+    --accent-primary: #2d89be;
+    --accent-secondary: #196297;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b8c4;
+    --text-muted: #6b7280;
+    --border-color: #1e293b;
+    --card-bg: #1a1d2e;
+    --hover-bg: #1e293b;
+}
+
+/* Routes Tab Container - Override default tab-content styles */
+/* Default: completely hidden when not active */
+#routes-tab:not(.active) {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* When routes tab is active, show it with flex layout */
+#routes-tab.active {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 100px) !important;
+    max-height: calc(100vh - 100px) !important;
+    background: var(--bg-primary) !important;
+    overflow: hidden !important;
+    position: relative !important;
+    padding: 0 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Header Bar */
+.routes-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-center {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Stat pills removed - using order-tab-btn style from main styles.css instead */
+
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(20, 59, 109, 0.8) 100%);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.btn-icon::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-icon:hover::before {
+    left: 100%;
+}
+
+.btn-icon:hover {
+    background: linear-gradient(135deg, var(--hover-bg) 0%, var(--bg-tertiary) 100%);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(45, 137, 190, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.date-selector {
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.date-selector:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-primary);
+}
+
+#plan-routes-btn {
+    padding: 10px 24px;
+    background: var(--accent-primary);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(45, 137, 190, 0.3);
+}
+
+#plan-routes-btn:hover {
+    background: var(--accent-secondary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(45, 137, 190, 0.4);
+}
+
+#plan-routes-btn:disabled {
+    background: var(--bg-tertiary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Drivers Section */
+.drivers-section {
+    padding: 16px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.drivers-list-routes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.driver-card-routes {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 180px;
+}
+
+.driver-card-routes:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: var(--accent-primary);
+    background: var(--hover-bg);
+}
+
+.driver-card-routes.selected {
+    border-color: var(--accent-primary);
+    background: rgba(45, 137, 190, 0.15);
+    box-shadow: 0 4px 16px rgba(45, 137, 190, 0.4);
+}
+
+.driver-avatar {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 50%;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.driver-info-routes {
+    flex: 1;
+    min-width: 0;
+}
+
+.driver-name-routes {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.driver-status-routes {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+/* Statistics Bar */
+.statistics-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stat-item {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-icon {
+    font-size: 20px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Main Content Area */
+.routes-main-content {
+    display: flex !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+    position: relative;
+    min-height: 0; /* Allow flex shrinking */
+}
+
+/* Routes List Panel (Left) - COLLAPSIBLE */
+.routes-list-panel {
+    width: 320px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.routes-list-panel.collapsed {
+    width: 40px;
+    min-width: 40px;
+    border-right: 1px solid var(--border-color);
+    overflow: visible;
+    padding: 0;
+    position: relative;
+}
+
+.routes-list-panel.collapsed .routes-panel-header {
+    opacity: 1;
+    pointer-events: auto;
+    padding: 16px 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 0;
+}
+
+.routes-list-panel.collapsed .routes-panel-title,
+.routes-list-panel.collapsed .view-toggle {
+    display: none;
+}
+
+.routes-list-panel.collapsed .collapse-btn {
+    width: 100%;
+    height: 40px;
+    border: none;
+    border-radius: 0;
+    background: var(--bg-tertiary);
+}
+
+.routes-list-panel.collapsed .collapse-btn:hover {
+    background: var(--hover-bg);
+}
+
+.routes-list-panel.collapsed .routes-list-container {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    overflow: hidden;
+    height: 0;
+}
+
+/* Show expand hint when collapsed */
+.routes-list-panel.collapsed::before {
+    content: 'Routes';
+    position: absolute;
+    left: 50%;
+    top: 60px;
+    transform: translateX(-50%) rotate(-90deg);
+    transform-origin: center;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.routes-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    min-height: 60px;
+}
+
+.routes-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.collapse-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+.collapse-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.collapse-icon {
+    font-size: 14px;
+    transition: transform 0.3s ease;
+}
+
+.routes-list-panel.collapsed .collapse-icon {
+    transform: rotate(180deg);
+}
+
+.routes-panel-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.view-toggle {
+    display: flex;
+    gap: 4px;
+}
+
+.view-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.view-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.view-btn.active {
+    background: var(--accent-primary);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+.routes-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.routes-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.routes-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.routes-list-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.routes-list-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+.route-card {
+    display: flex;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.route-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: var(--accent-primary);
+}
+
+.route-card.selected {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 16px rgba(45, 137, 190, 0.4);
+    background: rgba(45, 137, 190, 0.1);
+    position: relative;
+}
+
+.route-card.selected::after {
+    content: '→';
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+    color: var(--accent-primary);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+    50% {
+        opacity: 0.6;
+        transform: translateY(-50%) translateX(5px);
+    }
+}
+
+.route-color-bar {
+    width: 6px;
+    flex-shrink: 0;
+}
+
+.route-info {
+    flex: 1;
+    padding: 16px;
+}
+
+.route-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.route-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.route-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.route-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 12px;
+}
+
+.route-driver-badge {
+    font-size: 13px;
+    color: var(--accent-primary);
+    background: rgba(45, 137, 190, 0.15);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid rgba(45, 137, 190, 0.3);
+}
+
+.route-driver {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.route-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-route-optimize,
+.btn-route-manage {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-route-optimize:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(45, 137, 190, 0.3);
+}
+
+.btn-route-manage:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-secondary);
+    transform: translateY(-1px);
+}
+
+.empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Map Panel (Center) */
+.routes-map-panel {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    min-width: 0; /* Allow flex shrinking */
+}
+
+.routes-map-panel .map-container {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    border-radius: 0;
+    margin-top: 0;
+}
+
+#routes-tab .map-container {
+    height: 100% !important;
+    min-height: 100% !important;
+    margin-top: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* Timeline View (shown next to routes list when route is selected) */
+
+.timeline-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Timeline View (shown to the right of routes list when 📅 button is clicked) */
+.routes-timeline-view {
+    width: 380px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.routes-timeline-view.collapsed {
+    width: 40px;
+    min-width: 40px;
+    border-right: 1px solid var(--border-color);
+    overflow: visible;
+    padding: 0;
+    position: relative;
+}
+
+.routes-timeline-view.collapsed .timeline-view-header {
+    opacity: 1;
+    pointer-events: auto;
+    padding: 16px 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 0;
+}
+
+.routes-timeline-view.collapsed .timeline-view-header h3 {
+    display: none;
+}
+
+.routes-timeline-view.collapsed .collapse-btn {
+    width: 100%;
+    height: 40px;
+    border: none;
+    border-radius: 0;
+    background: var(--bg-tertiary);
+}
+
+.routes-timeline-view.collapsed .collapse-btn:hover {
+    background: var(--hover-bg);
+}
+
+.routes-timeline-view.collapsed .timeline-view-content {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    overflow: hidden;
+    height: 0;
+}
+
+/* Show expand hint when collapsed */
+.routes-timeline-view.collapsed::before {
+    content: 'Timeline';
+    position: absolute;
+    left: 50%;
+    top: 60px;
+    transform: translateX(-50%) rotate(-90deg);
+    transform-origin: center;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.timeline-view-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.timeline-view-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.timeline-view-content {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.timeline-view-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.timeline-view-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.timeline-view-content::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.timeline-view-content::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+.timeline-stops-container {
+    width: 100%;
+}
+
+.timeline-stop-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.timeline-stop-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: var(--accent-primary);
+    background: var(--hover-bg);
+}
+
+.timeline-stop-item[data-type="delivery"]:hover {
+    border-color: #008000;
+}
+
+.timeline-stop-item[data-type="parking"]:hover {
+    border-color: #FFA500;
+}
+
+.timeline-stop-item[data-type="depot"]:hover {
+    border-color: #FF0000;
+}
+
+.stop-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.stop-icon.stop-depot {
+    background: rgba(255, 0, 0, 0.2);
+    border: 2px solid #FF0000;
+}
+
+.stop-icon.stop-parking {
+    background: rgba(255, 165, 0, 0.2);
+    border: 2px solid #FFA500;
+}
+
+.stop-icon.stop-delivery {
+    background: rgba(0, 128, 0, 0.2);
+    border: 2px solid #008000;
+}
+
+.stop-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.stop-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.stop-details {
+    font-size: 13px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stop-sequence {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.timeline-segment {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 8px 64px;
+    position: relative;
+}
+
+.segment-line {
+    width: 2px;
+    height: 40px;
+    background: var(--accent-primary);
+    opacity: 0.5;
+    margin-left: 24px;
+}
+
+.segment-info {
+    display: flex;
+    gap: 16px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 12px;
+}
+
+.segment-distance {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.segment-time {
+    color: var(--text-secondary);
+}
+
+.timeline-error {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Collapsed Panel Toggle Button (when collapsed) */
+.routes-list-panel.collapsed + .routes-map-panel::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 80px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    z-index: 1000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 18px;
+    transition: all 0.3s ease;
+}
+
+.routes-list-panel.collapsed + .routes-map-panel::before:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1600px) {
+    .routes-left-panel {
+        width: 500px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .routes-left-panel {
+        width: 400px;
+    }
+}

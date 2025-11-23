@@ -76,6 +76,18 @@ docker-compose -f docker-compose.osrm.yml up -d
 http://localhost:8000
 ```
 
+### Importing Mock Orders
+
+Seed the API with 50 Baden-Württemberg mock orders (coordinates are geocoded automatically):
+
+```bash
+# Clear existing orders and import 50 new ones
+python3 scripts/import_mock_orders.py --clear-existing
+
+# Use a custom API base or limit the dataset
+API_BASE_URL=http://localhost:8000/api python3 scripts/import_mock_orders.py --limit 25
+```
+
 ## Usage
 
 ### Planner Interface

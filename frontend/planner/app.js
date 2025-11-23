@@ -1,19 +1,27 @@
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = window.__HHN_API_BASE || 'http://localhost:8000/api';
 
 let routeMap = null;
 let currentRouteMarkers = [];
 let currentRouteLayers = []; // Track all route-related layers (markers, polylines, arrows)
+let currentRouteData = null; // Store current route data for timeline interactions
+let deliveryInfoCard = null; // Store reference to delivery info card
+let selectedDriverId = null; // Track selected driver for filtering routes
+let allDrivers = []; // Store all drivers
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    setupTabs();
-    setupKeyboardShortcuts();
-    loadOrders();
-    loadDrivers();
-    loadRoutes();
-    loadDepots();
-    loadParkingLocations();
-    // Don't initialize map immediately - wait for routes tab to be shown
+    try {
+        setupTabs();
+        setupKeyboardShortcuts();
+        loadOrders();
+        loadDrivers();
+        loadRoutes();
+        loadDepots();
+        loadParkingLocations();
+        // Don't initialize map immediately - wait for routes tab to be shown
+    } catch (error) {
+        console.error('Error during initialization:', error);
+    }
 });
 
 // Keyboard shortcuts
@@ -58,21 +66,87 @@ function setupTabs() {
             btn.classList.add('active');
             document.getElementById(`${tab}-tab`).classList.add('active');
 
-            // Initialize map when routes tab is shown
-            if (tab === 'routes' && !routeMap) {
+            // Show/hide route header controls
+            const routeControls = document.getElementById('route-header-controls');
+            if (routeControls) {
+                if (tab === 'routes') {
+                    routeControls.style.display = 'flex';
+                } else {
+                    routeControls.style.display = 'none';
+                }
+            }
+
+            // Initialize map and route planning UI when routes tab is shown
+            if (tab === 'routes') {
                 setTimeout(() => {
-                    initRouteMap();
-                    console.log('Map initialized for routes tab');
+                    if (!routeMap) {
+                        initRouteMap();
+                        console.log('Map initialized for routes tab');
+                    } else {
+                        routeMap.invalidateSize();
+                        console.log('Map size invalidated');
+                    }
+                    // Initialize route planning UI
+                    initRoutePlanningUI();
+                    // Setup collapse toggle
+                    setupRoutesPanelCollapse();
                 }, 200); // Small delay to ensure container is visible
-            } else if (tab === 'routes' && routeMap) {
-                // Invalidate size when switching back to routes tab
-                setTimeout(() => {
-                    routeMap.invalidateSize();
-                    console.log('Map size invalidated');
-                }, 200);
+            }
+
+            // Load summary data when summary tab is shown
+            if (tab === 'summary') {
+                loadSummary();
+            }
+
+            // Load archive data when archive tab is shown
+            if (tab === 'archive') {
+                loadArchive();
             }
         });
     });
+
+    // Setup navigation collapse toggle
+    setupNavCollapse();
+
+    // Initialize route controls visibility on page load
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+    const routeControls = document.getElementById('route-header-controls');
+    if (routeControls) {
+        if (activeTab === 'routes') {
+            routeControls.style.display = 'flex';
+        } else {
+            routeControls.style.display = 'none';
+        }
+    }
+}
+
+// Navigation collapse functionality
+function setupNavCollapse() {
+    try {
+        const collapseBtn = document.getElementById('nav-collapse-btn');
+        const tabs = document.querySelector('.tabs');
+        const collapseIcon = collapseBtn?.querySelector('.collapse-icon');
+
+        if (collapseBtn && tabs) {
+            collapseBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event bubbling but allow default behavior
+                tabs.classList.toggle('collapsed');
+
+                // Rotate icon when collapsed
+                if (collapseIcon) {
+                    if (tabs.classList.contains('collapsed')) {
+                        collapseIcon.style.transform = 'rotate(180deg)';
+                    } else {
+                        collapseIcon.style.transform = 'rotate(0deg)';
+                    }
+                }
+            });
+        } else {
+            console.warn('Navigation collapse button or tabs not found');
+        }
+    } catch (error) {
+        console.error('Error setting up navigation collapse:', error);
+    }
 }
 
 // API helpers
@@ -86,7 +160,14 @@ async function apiCall(endpoint, options = {}) {
             ...options
         });
         if (!response.ok) {
-            throw new Error(`API error: ${response.statusText}`);
+            let errorDetail = response.statusText;
+            try {
+                const errorJson = await response.json();
+                errorDetail = errorJson.detail || errorJson.message || response.statusText;
+            } catch (e) {
+                // If response is not JSON, use statusText
+            }
+            throw new Error(`API error: ${errorDetail}`);
         }
         return await response.json();
     } catch (error) {
@@ -100,47 +181,149 @@ async function apiCall(endpoint, options = {}) {
 let currentOrderView = 'all'; // 'all' or 'unfinished'
 
 function switchOrderView(view) {
+    console.log('switchOrderView called with view:', view);
+
+    // Always update the view, even if it's the same
     currentOrderView = view;
+
+    // Update stat pill buttons
+    const allBtn = document.getElementById('all-orders-pill');
+    const unfinishedBtn = document.getElementById('unfinished-orders-pill');
+
+    if (allBtn && unfinishedBtn) {
+        // Remove active class from both
+        allBtn.classList.remove('active');
+        unfinishedBtn.classList.remove('active');
+
+        // Add active class to the selected button
+        if (view === 'all') {
+            allBtn.classList.add('active');
+        } else if (view === 'unfinished') {
+            unfinishedBtn.classList.add('active');
+        }
+    } else {
+        console.error('Could not find stat pill buttons!', { allBtn, unfinishedBtn });
+    }
+
+    console.log('Current view set to:', currentOrderView);
+    console.log('Reloading orders...');
+
+    // Force reload orders with the new view
+    loadOrders();
+}
+
+// Make sure function is accessible globally for onclick handlers
+if (typeof window !== 'undefined') {
+    window.switchOrderView = switchOrderView;
+}
+
+// Switch route view (all routes vs unscheduled)
+function switchRouteView(view) {
     // Update tab buttons
-    document.querySelectorAll('.order-tab-btn').forEach(btn => {
+    document.querySelectorAll('#all-routes-btn, #unscheduled-routes-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.view === view) {
             btn.classList.add('active');
         }
     });
-    loadOrders();
+
+    // Filter routes based on view
+    if (view === 'unscheduled') {
+        // Show only unscheduled routes (routes with pending orders)
+        // This would need to filter the displayed routes
+        loadPlannedRoutes();
+    } else {
+        // Show all routes
+        loadPlannedRoutes();
+    }
 }
 
 async function loadOrders() {
     const status = document.getElementById('order-status-filter')?.value || '';
     const source = document.getElementById('order-source-filter')?.value || '';
 
-    let url = '/orders';
-    const params = [];
-    if (status) params.push(`status=${status}`);
-    if (source) params.push(`source=${source}`);
-    if (currentOrderView === 'unfinished') {
-        params.push('unfinished=true');
-    }
-    // Don't add unfinished=false - that would filter out unfinished orders
-    if (params.length) url += '?' + params.join('&');
+    // Fetch all orders for counting
+    let allOrdersUrl = '/orders';
+    const allParams = [];
+    if (status) allParams.push(`status=${status}`);
+    if (source) allParams.push(`source=${source}`);
+    if (allParams.length) allOrdersUrl += '?' + allParams.join('&');
 
     try {
-        const orders = await apiCall(url);
-        displayOrders(orders);
+        // Fetch all orders first to get accurate counts
+        const allOrders = await apiCall(allOrdersUrl);
+
+        // Determine which orders to display based on view
+        let ordersToDisplay = allOrders;
+        if (currentOrderView === 'unfinished') {
+            // Fetch unfinished orders from backend
+            let unfinishedUrl = '/orders';
+            const unfinishedParams = [];
+            if (status) unfinishedParams.push(`status=${status}`);
+            if (source) unfinishedParams.push(`source=${source}`);
+            unfinishedParams.push('unfinished=true');
+            unfinishedUrl += '?' + unfinishedParams.join('&');
+            ordersToDisplay = await apiCall(unfinishedUrl);
+        } else {
+            // For 'all' view (now called "Orders"), show only finished orders
+            // Filter out unfinished orders client-side
+            ordersToDisplay = allOrders.filter(order => {
+                const hasErrors = order.validation_errors && order.validation_errors.length > 0;
+                const isUnfinished = hasErrors || !order.delivery_address || order.delivery_address.trim() === '';
+                return !isUnfinished; // Only finished orders
+            });
+        }
+
+        displayOrders(allOrders, ordersToDisplay);
     } catch (error) {
         console.error('Failed to load orders:', error);
+        alert(`Failed to load orders: ${error.message}`);
     }
 }
 
-function displayOrders(orders) {
+function displayOrders(allOrders, ordersToDisplay) {
     const container = document.getElementById('orders-list');
-    if (!orders || orders.length === 0) {
+
+    // If ordersToDisplay not provided, use allOrders
+    ordersToDisplay = ordersToDisplay || allOrders || [];
+    allOrders = allOrders || ordersToDisplay || [];
+
+    // Calculate counts from all orders
+    const finishedOrdersCount = allOrders.filter(order => {
+        const hasErrors = order.validation_errors && order.validation_errors.length > 0;
+        const isUnfinished = hasErrors || !order.delivery_address || order.delivery_address.trim() === '';
+        return !isUnfinished; // Finished orders
+    }).length;
+
+    const unfinishedOrdersCount = allOrders.filter(order => {
+        const hasErrors = order.validation_errors && order.validation_errors.length > 0;
+        const isUnfinished = hasErrors || !order.delivery_address || order.delivery_address.trim() === '';
+        return isUnfinished;
+    }).length;
+
+    // Update count badges
+    const allCountEl = document.getElementById('all-orders-count');
+    const unfinishedCountEl = document.getElementById('unfinished-orders-count');
+
+    if (allCountEl) allCountEl.textContent = finishedOrdersCount; // Show count of finished orders
+    if (unfinishedCountEl) unfinishedCountEl.textContent = unfinishedOrdersCount;
+
+    // Sort orders by created_at (newest first)
+    let sortedOrders = [...ordersToDisplay];
+    if (sortedOrders.length > 0) {
+        sortedOrders.sort((a, b) => {
+            const aDate = new Date(a.created_at || 0);
+            const bDate = new Date(b.created_at || 0);
+            return bDate - aDate; // Newest first
+        });
+    }
+
+    if (!sortedOrders || sortedOrders.length === 0) {
         container.innerHTML = '<p>No orders found</p>';
         return;
     }
 
-    container.innerHTML = orders.map(order => {
+    container.innerHTML = sortedOrders.map(order => {
         const priorityClass = order.priority || 'normal';
         const timeWindow = order.delivery_time_window_start && order.delivery_time_window_end
             ? `${new Date(order.delivery_time_window_start).toLocaleString()} - ${new Date(order.delivery_time_window_end).toLocaleString()}`
@@ -833,12 +1016,207 @@ async function updateRoute(event, routeId) {
 
 async function optimizeRoute(routeId) {
     try {
-        await apiCall(`/routes/${routeId}/optimize`, { method: 'POST' });
-        alert('Route optimized successfully!');
-        loadRoutes();
+        const result = await apiCall(`/routes/${routeId}/optimize`, { method: 'POST' });
+
+        // Show optimization results
+        const metrics = result.optimization_metrics || {};
+        const summary = result.route_summary || {};
+        let message = 'Route optimized successfully!';
+
+        if (metrics.distance_improvement_percent) {
+            message += `\nDistance improved by ${metrics.distance_improvement_percent.toFixed(1)}%`;
+        }
+        if (summary.total_distance_km) {
+            message += `\nNew total distance: ${summary.total_distance_km.toFixed(2)}km`;
+        }
+
+        alert(message);
+
+        // Reload routes to show updated data
+        loadPlannedRoutes();
+
+        // If this route is currently selected, refresh the map view
+        const selectedCard = document.querySelector(`.route-card[data-route-id="${routeId}"].selected`);
+        if (selectedCard) {
+            viewRoute(routeId);
+        }
     } catch (error) {
-        alert(`Optimization failed: ${error.message}`);
+        console.error('Route optimization error:', error);
+        alert(`Optimization failed: ${error.message || 'Unknown error'}`);
     }
+}
+
+// Make function globally accessible
+if (typeof window !== 'undefined') {
+    window.optimizeRoute = optimizeRoute;
+}
+
+async function manageRouteOrders(routeId) {
+    try {
+        // Get route details with orders
+        const route = await apiCall(`/routes/${routeId}`);
+
+        // Get all orders (not just pending, to include already assigned ones)
+        const allOrders = await apiCall('/orders');
+
+        // Get current route orders
+        const currentOrderIds = route.route_orders ? route.route_orders.map(ro => ro.order_id) : [];
+        const currentOrders = [];
+        const availableOrders = [];
+
+        // Separate current and available orders
+        for (const order of allOrders) {
+            if (currentOrderIds.includes(order.id)) {
+                // This order is in the current route
+                currentOrders.push(order);
+            } else if (!order.assigned_driver_id || order.status === 'pending' || order.status === 'assigned') {
+                // This order is available to be added (unassigned or can be reassigned)
+                availableOrders.push(order);
+            }
+        }
+
+        // Sort current orders by sequence
+        if (route.route_orders) {
+            currentOrders.sort((a, b) => {
+                const roA = route.route_orders.find(ro => ro.order_id === a.id);
+                const roB = route.route_orders.find(ro => ro.order_id === b.id);
+                return (roA?.sequence || 0) - (roB?.sequence || 0);
+            });
+        }
+
+        // Create modal HTML
+        const modalHTML = `
+            <h2>Manage Route Orders</h2>
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Current Orders (${currentOrders.length})</h3>
+                <div id="current-orders-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: var(--bg-secondary);">
+                    ${currentOrders.length > 0 ? currentOrders.map((order, idx) => `
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; margin-bottom: 8px; background: var(--card-bg); border-radius: 6px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: var(--text-primary);">${order.order_number || `Order #${order.id}`}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${order.delivery_address || 'No address'}</div>
+                            </div>
+                            <button onclick="removeOrderFromRoute(${order.id})" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                        </div>
+                    `).join('') : '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No orders in route</p>'}
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Available Orders (${availableOrders.length})</h3>
+                <div id="available-orders-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: var(--bg-secondary);">
+                    ${availableOrders.length > 0 ? availableOrders.map(order => `
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; margin-bottom: 8px; background: var(--card-bg); border-radius: 6px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: var(--text-primary);">${order.order_number || `Order #${order.id}`}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${order.delivery_address || 'No address'}</div>
+                            </div>
+                            <button onclick="addOrderToRoute(${order.id})" style="padding: 6px 12px; background: var(--accent-primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Add</button>
+                        </div>
+                    `).join('') : '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No available orders</p>'}
+                </div>
+            </div>
+
+            <div class="form-actions" style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRouteOrders(${routeId})">Save Changes</button>
+                <button type="button" class="btn btn-primary" onclick="saveAndOptimizeRoute(${routeId})" style="background: var(--accent-primary);">Save & Optimize</button>
+            </div>
+        `;
+
+        showModal(modalHTML);
+
+        // Store current state for management
+        window.currentRouteOrders = currentOrderIds;
+        window.currentRouteId = routeId;
+
+    } catch (error) {
+        console.error('Failed to load route orders:', error);
+        alert(`Failed to load route orders: ${error.message}`);
+    }
+}
+
+function addOrderToRoute(orderId) {
+    if (!window.currentRouteOrders) {
+        window.currentRouteOrders = [];
+    }
+    if (!window.currentRouteOrders.includes(orderId)) {
+        window.currentRouteOrders.push(orderId);
+        // Update UI
+        const addBtn = event.target;
+        const orderItem = addBtn.closest('div[style*="display: flex"]');
+        if (orderItem) {
+            addBtn.textContent = 'Added';
+            addBtn.disabled = true;
+            addBtn.style.background = '#10b981';
+        }
+    }
+}
+
+function removeOrderFromRoute(orderId) {
+    if (window.currentRouteOrders) {
+        window.currentRouteOrders = window.currentRouteOrders.filter(id => id !== orderId);
+        // Update UI
+        const removeBtn = event.target;
+        const orderItem = removeBtn.closest('div[style*="display: flex"]');
+        if (orderItem) {
+            orderItem.style.opacity = '0.5';
+            removeBtn.textContent = 'Removed';
+            removeBtn.disabled = true;
+        }
+    }
+}
+
+async function saveRouteOrders(routeId) {
+    try {
+        const orderIds = window.currentRouteOrders || [];
+
+        // Create route order items with sequence
+        const orderItems = orderIds.map((orderId, index) => ({
+            order_id: orderId,
+            sequence: index + 1
+        }));
+
+        await apiCall(`/routes/${routeId}/orders`, {
+            method: 'POST',
+            body: JSON.stringify(orderItems)
+        });
+
+        alert('Route orders updated successfully!');
+        closeModal();
+        loadPlannedRoutes();
+
+        // Refresh map if route is selected
+        const selectedCard = document.querySelector(`.route-card[data-route-id="${routeId}"].selected`);
+        if (selectedCard) {
+            viewRoute(routeId);
+        }
+    } catch (error) {
+        console.error('Failed to save route orders:', error);
+        alert(`Failed to save route orders: ${error.message}`);
+    }
+}
+
+async function saveAndOptimizeRoute(routeId) {
+    try {
+        // First save the orders
+        await saveRouteOrders(routeId);
+
+        // Then optimize
+        await optimizeRoute(routeId);
+    } catch (error) {
+        console.error('Failed to save and optimize route:', error);
+        alert(`Failed to save and optimize route: ${error.message}`);
+    }
+}
+
+// Make functions globally accessible
+if (typeof window !== 'undefined') {
+    window.manageRouteOrders = manageRouteOrders;
+    window.addOrderToRoute = addOrderToRoute;
+    window.removeOrderFromRoute = removeOrderFromRoute;
+    window.saveRouteOrders = saveRouteOrders;
+    window.saveAndOptimizeRoute = saveAndOptimizeRoute;
 }
 
 async function viewRoute(routeId) {
@@ -855,15 +1233,28 @@ async function viewRoute(routeId) {
         // Get route visualization data
         const routeData = await apiCall(`/routes/${routeId}/visualize`);
         console.log('Route data received:', routeData);
+        currentRouteData = routeData; // Store for timeline interactions
         displayRouteOnMap(routeData);
+
+        // If timeline view is active, update it
+        const timelineBtn = document.querySelector('.view-btn[data-view="timeline"]');
+        if (timelineBtn && timelineBtn.classList.contains('active')) {
+            loadTimelineView(routeId);
+        }
     } catch (error) {
         console.error('Failed to load route:', error);
         alert(`Failed to load route visualization: ${error.message}`);
     }
 }
 
-function displayRouteOnMap(routeData) {
+function displayRouteOnMap(routeData, routeColor = null, routeIndex = 0, retryCount = 0) {
     console.log('Displaying route on map:', routeData);
+
+    if (retryCount > 5) {
+        console.error('Failed to initialize map after multiple retries');
+        alert('Could not initialize map. Please reload the page.');
+        return;
+    }
 
     if (!routeMap) {
         // Initialize map if not already done
@@ -872,7 +1263,7 @@ function displayRouteOnMap(routeData) {
         // Wait a bit for map to initialize
         setTimeout(() => {
             console.log('Retrying display after map init');
-            displayRouteOnMap(routeData);
+            displayRouteOnMap(routeData, routeColor, routeIndex, retryCount + 1);
         }, 500);
         return;
     }
@@ -880,7 +1271,7 @@ function displayRouteOnMap(routeData) {
     // Double-check map is ready
     if (!routeMap || !routeMap.getContainer()) {
         console.error('Map container not ready');
-        setTimeout(() => displayRouteOnMap(routeData), 300);
+        setTimeout(() => displayRouteOnMap(routeData, routeColor, routeIndex, retryCount + 1), 300);
         return;
     }
 
@@ -925,18 +1316,30 @@ function displayRouteOnMap(routeData) {
         const iconHtml = type === 'depot' ? '🏭' : type === 'parking' ? '🅿️' : '📦';
         return L.divIcon({
             className: 'custom-marker',
-            html: `<div style="background-color: ${color}; border: 3px solid white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${iconHtml}</div>`,
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
+            html: `<div style="background-color: ${color}; border: 3px solid white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 2000; position: relative;">${iconHtml}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
         });
     };
 
     // Add waypoints with color-coded markers
     const waypointMarkers = [];
+    console.log(`Adding ${routeData.waypoints.length} waypoints to map`);
     routeData.waypoints.forEach((waypoint, index) => {
-        const icon = createIcon(waypoint.color, waypoint.type);
-        const marker = L.marker([waypoint.lat, waypoint.lng], { icon })
-            .addTo(routeMap);
+        // Handle both 'lng' and 'lon' field names for compatibility
+        const lng = waypoint.lng || waypoint.lon;
+        if (!waypoint.lat || !lng) {
+            console.warn('Waypoint missing coordinates:', waypoint);
+            return;
+        }
+        console.log(`Adding waypoint ${index + 1}: ${waypoint.type} at [${waypoint.lat}, ${lng}]`);
+        const waypointColor = waypoint.color || (routeColor ? routeColor : (waypoint.type === 'depot' ? '#FF0000' : waypoint.type === 'parking' ? '#FFA500' : '#008000'));
+        const icon = createIcon(waypointColor, waypoint.type);
+        const marker = L.marker([waypoint.lat, lng], {
+            icon,
+            zIndexOffset: 2000,
+            riseOnHover: true
+        }).addTo(routeMap);
 
         // Create popup content
         let popupContent = `<strong>${waypoint.type.toUpperCase()}</strong><br>`;
@@ -967,13 +1370,16 @@ function displayRouteOnMap(routeData) {
     });
 
     // Draw route - use OSRM geometry if available (real road routes), otherwise use segments
-    if (routeData.geometry) {
+    const hasOsrmGeometry = routeData.geometry && routeData.geometry.coordinates && routeData.geometry.coordinates.length > 0;
+
+    if (hasOsrmGeometry) {
         console.log('Using OSRM geometry for route display');
         // Use OSRM route geometry (GeoJSON LineString) - this shows actual roads!
         try {
+            const routeLineColor = routeColor || '#0066cc';
             const routeLayer = L.geoJSON(routeData.geometry, {
                 style: {
-                    color: '#0066cc',
+                    color: routeLineColor,
                     weight: 5,
                     opacity: 0.8
                 }
@@ -984,7 +1390,7 @@ function displayRouteOnMap(routeData) {
             const coordinates = routeData.geometry.coordinates;
             if (coordinates && coordinates.length > 1) {
                 // Add arrows at regular intervals
-                const arrowInterval = Math.max(1, Math.floor(coordinates.length / 10));
+                const arrowInterval = Math.max(1, Math.floor(coordinates.length / 15));
                 for (let i = arrowInterval; i < coordinates.length - 1; i += arrowInterval) {
                     const [lng1, lat1] = coordinates[i - 1];
                     const [lng2, lat2] = coordinates[i];
@@ -992,14 +1398,18 @@ function displayRouteOnMap(routeData) {
                     const midLng = (lng1 + lng2) / 2;
 
                     const bearing = getBearing({ lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 });
+                    // Arrow character points right (0°), so we need to rotate it by the bearing
+                    // Also add 90° because the arrow starts pointing east, but we want it to point in the direction of travel
+                    const arrowRotation = bearing;
+                    const arrowColor = routeColor || '#0066cc';
                     const arrowIcon = L.divIcon({
                         className: 'route-arrow',
-                        html: `<div style="color: #0066cc; font-size: 18px; transform: rotate(${bearing}deg);">➤</div>`,
-                        iconSize: [18, 18],
-                        iconAnchor: [9, 9]
+                        html: `<div style="color: ${arrowColor}; font-size: 20px; transform: rotate(${arrowRotation}deg); transform-origin: center; display: inline-block; width: 20px; height: 20px; text-align: center; line-height: 20px;">➤</div>`,
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
                     });
 
-                    const arrowMarker = L.marker([midLat, midLng], { icon: arrowIcon, interactive: false })
+                    const arrowMarker = L.marker([midLat, midLng], { icon: arrowIcon, interactive: false, zIndexOffset: 1000 })
                         .addTo(routeMap);
                     currentRouteLayers.push(arrowMarker);
                 }
@@ -1011,8 +1421,8 @@ function displayRouteOnMap(routeData) {
     }
 
     // Fallback: Draw route segments with color coding (straight lines between waypoints)
-    if (!routeData.geometry && routeData.segments && routeData.segments.length > 0) {
-        console.log('Using fallback segments (no OSRM geometry available)');
+    if (!hasOsrmGeometry && routeData.segments && routeData.segments.length > 0) {
+        console.log('Using fallback straight-line segments (OSRM geometry not available)');
         routeData.segments.forEach((segment, index) => {
             const fromWaypoint = routeData.waypoints[index];
             const toWaypoint = routeData.waypoints[index + 1];
@@ -1021,10 +1431,12 @@ function displayRouteOnMap(routeData) {
             const segmentColor = toWaypoint.color;
             const segmentWeight = 4;
 
+            const fromLng = segment.from.lng || segment.from.lon;
+            const toLng = segment.to.lng || segment.to.lon;
             const polyline = L.polyline(
                 [
-                    [segment.from.lat, segment.from.lng],
-                    [segment.to.lat, segment.to.lng]
+                    [segment.from.lat, fromLng],
+                    [segment.to.lat, toLng]
                 ],
                 {
                     color: segmentColor,
@@ -1037,25 +1449,31 @@ function displayRouteOnMap(routeData) {
 
             // Add direction arrow in the middle of the segment
             const midLat = (segment.from.lat + segment.to.lat) / 2;
-            const midLng = (segment.from.lng + segment.to.lng) / 2;
+            // fromLng and toLng are already defined above
+            const midLng = (fromLng + toLng) / 2;
+            const bearing = getBearing({ lat: segment.from.lat, lng: fromLng }, { lat: segment.to.lat, lng: toLng });
 
             // Create arrow marker
             const arrowIcon = L.divIcon({
                 className: 'route-arrow',
-                html: `<div style="color: ${segmentColor}; font-size: 20px; transform: rotate(${getBearing(segment.from, segment.to)}deg);">➤</div>`,
+                html: `<div style="color: ${segmentColor}; font-size: 20px; transform: rotate(${bearing}deg); transform-origin: center; display: inline-block; width: 20px; height: 20px; text-align: center; line-height: 20px;">➤</div>`,
                 iconSize: [20, 20],
                 iconAnchor: [10, 10]
             });
 
-            const arrowMarker = L.marker([midLat, midLng], { icon: arrowIcon, interactive: false })
+            const arrowMarker = L.marker([midLat, midLng], { icon: arrowIcon, interactive: false, zIndexOffset: 1000 })
                 .addTo(routeMap);
             currentRouteLayers.push(arrowMarker);
         });
     } else if (!routeData.geometry) {
         // Final fallback: draw simple polyline connecting all waypoints
-        const latlngs = routeData.waypoints.map(w => [w.lat, w.lng]);
+        const latlngs = routeData.waypoints.map(w => {
+            const lng = w.lng || w.lon;
+            return [w.lat, lng];
+        }).filter(coord => coord[0] && coord[1]);
+        const fallbackColor = routeColor || '#0066cc';
         const fallbackPolyline = L.polyline(latlngs, {
-            color: '#0066cc',
+            color: fallbackColor,
             weight: 4,
             opacity: 0.7
         }).addTo(routeMap);
@@ -1081,37 +1499,32 @@ function displayRouteOnMap(routeData) {
         console.warn('No waypoint markers to fit bounds');
     }
 
-    // Display route summary
-    const summary = routeData.summary;
-    const summaryHtml = `
-        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 250px;">
-            <h3 style="margin: 0 0 10px 0; font-size: 16px;">Route Summary</h3>
-            <p style="margin: 5px 0;"><strong>Distance:</strong> ${summary.total_distance_km.toFixed(2)} km</p>
-            <p style="margin: 5px 0;"><strong>Time:</strong> ${Math.round(summary.total_time_minutes)} min</p>
-            <p style="margin: 5px 0;"><strong>Stops:</strong> ${summary.waypoint_count}</p>
-            <p style="margin: 5px 0;"><strong>Deliveries:</strong> ${summary.delivery_count}</p>
-            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
-                <p style="margin: 5px 0; font-size: 12px;"><strong>Legend:</strong></p>
-                <p style="margin: 2px 0; font-size: 12px;"><span style="color: ${routeData.colors.depot};">●</span> Depot</p>
-                <p style="margin: 2px 0; font-size: 12px;"><span style="color: ${routeData.colors.parking};">●</span> Parking</p>
-                <p style="margin: 2px 0; font-size: 12px;"><span style="color: ${routeData.colors.delivery};">●</span> Delivery</p>
-            </div>
+    // Update statistics bar with route data
+    updateRouteStatistics(routeData.summary, hasOsrmGeometry);
+
+    // Display route legend on map (only legend, not full summary)
+    const legendHtml = `
+        <div style="background: #ffffff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); max-width: 200px; border: 1px solid #e0e0e0; position: absolute; top: 10px; right: 10px; z-index: 1000;">
+            <p style="margin: 5px 0; font-size: 12px; color: #131320; font-weight: 600;"><strong>Legend:</strong></p>
+                <p style="margin: 2px 0; font-size: 12px; color: #131320;"><span style="color: ${routeData.colors.depot};">●</span> Depot</p>
+                <p style="margin: 2px 0; font-size: 12px; color: #131320;"><span style="color: ${routeData.colors.parking};">●</span> Parking</p>
+                <p style="margin: 2px 0; font-size: 12px; color: #131320;"><span style="color: ${routeData.colors.delivery};">●</span> Delivery</p>
         </div>
     `;
 
-    // Remove existing summary if any
-    const existingSummary = document.getElementById('route-summary');
-    if (existingSummary) {
-        existingSummary.remove();
+    // Remove existing legend if any
+    const existingLegend = document.getElementById('route-legend');
+    if (existingLegend) {
+        existingLegend.remove();
     }
 
-    // Add summary to map container
+    // Add legend to map container
     const mapContainerDiv = document.getElementById('route-map-container');
     if (mapContainerDiv) {
-        const summaryDiv = document.createElement('div');
-        summaryDiv.id = 'route-summary';
-        summaryDiv.innerHTML = summaryHtml;
-        mapContainerDiv.appendChild(summaryDiv);
+        const legendDiv = document.createElement('div');
+        legendDiv.id = 'route-legend';
+        legendDiv.innerHTML = legendHtml;
+        mapContainerDiv.appendChild(legendDiv);
     }
 }
 
@@ -1310,11 +1723,11 @@ function initRouteMap() {
 
     console.log('Initializing map container:', routeMapElement.offsetWidth, 'x', routeMapElement.offsetHeight);
 
-    // Set initial view to Berlin (where sample data is)
+    // Set initial view to Heilbronn depot location
     routeMap = L.map('route-map', {
         preferCanvas: false, // Use canvas for better performance
         zoomControl: true
-    }).setView([52.5200, 13.4050], 12);
+    }).setView([49.1372, 9.2074], 13);
 
     // Use a more reliable tile layer with retry logic
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1768,4 +2181,1455 @@ async function parseAndCreateOrder() {
             parseBtn.textContent = '📝 Parse & Create Order';
         }
     }
+}
+
+// ==================== NEW ROUTE PLANNING UI ====================
+
+let plannedRoutes = [];
+let currentDate = new Date();
+let allRoutes = [];
+
+// Initialize route planning UI when routes tab is shown
+function initRoutePlanningUI() {
+    updateDateDisplay();
+    setupDateNavigation();
+    setupPlanRoutesButton();
+    loadRouteStatistics();
+    loadPlannedRoutes();
+    setupDepotsButton();
+    setupTimelineViewToggle();
+    setupTimelineCollapse();
+}
+
+// Update date display
+function updateDateDisplay() {
+    const dateElement = document.getElementById('current-date');
+    if (dateElement) {
+        const options = { weekday: 'short', month: 'short', day: 'numeric' };
+        dateElement.textContent = currentDate.toLocaleDateString('en-US', options);
+    }
+}
+
+// Setup date navigation
+function setupDateNavigation() {
+    const prevBtn = document.getElementById('date-prev');
+    const nextBtn = document.getElementById('date-next');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            currentDate.setDate(currentDate.getDate() - 1);
+            updateDateDisplay();
+            loadPlannedRoutes();
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            currentDate.setDate(currentDate.getDate() + 1);
+            updateDateDisplay();
+            loadPlannedRoutes();
+        });
+    }
+}
+
+// Setup plan routes button
+function setupPlanRoutesButton() {
+    const planBtn = document.getElementById('plan-routes-btn');
+    if (planBtn) {
+        planBtn.addEventListener('click', () => {
+            planRoutesAutomatically();
+        });
+    }
+}
+
+// Plan routes automatically
+async function planRoutesAutomatically() {
+    try {
+        const planBtn = document.getElementById('plan-routes-btn');
+        if (planBtn) {
+            planBtn.disabled = true;
+            planBtn.textContent = 'Planning...';
+        }
+
+        // Use today's date or null (which allows all pending orders)
+        const dateStr = currentDate ? currentDate.toISOString().split('T')[0] : null;
+
+        const response = await apiCall('/routes/plan', {
+            method: 'POST',
+            body: JSON.stringify({
+                date: dateStr,  // Can be null to get all pending orders
+                max_distance_km: 10.0,
+                min_orders_per_route: 3,
+                max_orders_per_route: 40,
+                clustering_method: 'dbscan',
+                assignment_strategy: 'balanced'
+            })
+        });
+
+        plannedRoutes = response.routes || [];
+
+        // Update statistics
+        updateStatistics(response.statistics);
+
+        // Ensure packages stat is visible
+        const packagesEl = document.getElementById('stat-packages');
+        if (packagesEl) {
+            const packagesItem = packagesEl.closest('.stat-item');
+            if (packagesItem) {
+                packagesItem.style.display = 'flex';
+            }
+        }
+
+        // Update scheduled/unscheduled counts
+        updateOrderCounts(response.statistics);
+
+        // Display routes
+        displayPlannedRoutes(plannedRoutes);
+
+        // Routes are now only displayed when clicked, not automatically
+        // Timeline is now shown when route is selected, no need to update here
+
+        if (planBtn) {
+            planBtn.disabled = false;
+            planBtn.textContent = 'Plan Routes';
+        }
+
+        alert(`Successfully planned ${plannedRoutes.length} routes!`);
+    } catch (error) {
+        console.error('Route planning failed:', error);
+        alert(`Route planning failed: ${error.message}`);
+
+        const planBtn = document.getElementById('plan-routes-btn');
+        if (planBtn) {
+            planBtn.disabled = false;
+            planBtn.textContent = 'Plan Routes';
+        }
+    }
+}
+
+// Update statistics bar
+function updateStatistics(stats) {
+    if (!stats) return;
+
+    const driversEl = document.getElementById('stat-drivers');
+    const packagesEl = document.getElementById('stat-packages');
+    const distanceEl = document.getElementById('stat-distance');
+    const timeEl = document.getElementById('stat-time');
+    const depotsEl = document.getElementById('stat-depots');
+
+    if (driversEl) driversEl.textContent = stats.drivers_used || 0;
+    if (packagesEl) {
+        packagesEl.textContent = stats.total_orders || 0;
+        // Ensure packages stat is visible
+        const packagesItem = packagesEl.closest('.stat-item');
+        if (packagesItem) {
+            packagesItem.style.display = 'flex';
+        }
+    }
+    if (distanceEl) distanceEl.textContent = `${stats.total_distance_km || 0}km`;
+
+    if (timeEl) {
+        const hours = Math.floor((stats.total_time_minutes || 0) / 60);
+        const minutes = Math.round((stats.total_time_minutes || 0) % 60);
+        timeEl.textContent = `${hours}h ${minutes}m`;
+    }
+
+    if (depotsEl) depotsEl.textContent = '1';
+
+    // Hide route-specific stats
+    hideRouteStatistics();
+}
+
+// Update statistics bar with route-specific data
+function updateRouteStatistics(summary, hasOsrmGeometry) {
+    const distanceEl = document.getElementById('stat-distance');
+    const timeEl = document.getElementById('stat-time');
+    const packagesEl = document.getElementById('stat-packages');
+    const stopsEl = document.getElementById('stat-stops');
+    const stopsValueEl = document.getElementById('stat-stops-value');
+    const routingEl = document.getElementById('stat-routing');
+    const routingLabelEl = document.getElementById('stat-routing-label');
+
+    if (distanceEl && summary) {
+        distanceEl.textContent = `${summary.total_distance_km.toFixed(2)}km`;
+    }
+
+    if (timeEl && summary) {
+        const hours = Math.floor(summary.total_time_minutes / 60);
+        const minutes = Math.round(summary.total_time_minutes % 60);
+        timeEl.textContent = `${hours}h ${minutes}m`;
+    }
+
+    // Update packages stat with delivery count when route is selected
+    if (packagesEl && summary) {
+        packagesEl.textContent = summary.delivery_count || 0;
+        // Ensure packages stat is visible
+        const packagesItem = packagesEl.closest('.stat-item');
+        if (packagesItem) {
+            packagesItem.style.display = 'flex';
+        }
+    }
+
+    if (stopsEl && stopsValueEl && summary) {
+        stopsValueEl.textContent = summary.waypoint_count || 0;
+        stopsEl.style.display = 'flex';
+    }
+
+    if (routingEl && routingLabelEl) {
+        routingLabelEl.textContent = hasOsrmGeometry ? '🛣️ Real roads' : '📏 Straight lines';
+        routingEl.style.display = 'flex';
+    }
+}
+
+// Hide route-specific statistics
+function hideRouteStatistics() {
+    const stopsEl = document.getElementById('stat-stops');
+    const routingEl = document.getElementById('stat-routing');
+
+    if (stopsEl) stopsEl.style.display = 'none';
+    if (routingEl) routingEl.style.display = 'none';
+}
+
+// Update order counts (scheduled/unscheduled)
+function updateOrderCounts(stats) {
+    const unscheduledEl = document.getElementById('unscheduled-count');
+    const scheduledEl = document.getElementById('scheduled-count');
+
+    if (unscheduledEl) unscheduledEl.textContent = stats.unscheduled_orders || 0;
+    if (scheduledEl) scheduledEl.textContent = stats.total_orders || 0;
+}
+
+// Load route statistics
+async function loadRouteStatistics() {
+    try {
+        const routes = await apiCall('/routes?status=planned');
+        allRoutes = routes;
+
+        let totalOrders = 0;
+        let totalDistance = 0;
+        let totalTime = 0;
+        const driversUsed = new Set();
+
+        for (const route of routes) {
+            if (route.route_orders) {
+                totalOrders += route.route_orders.length;
+            }
+            driversUsed.add(route.driver_id);
+        }
+
+        updateStatistics({
+            drivers_used: driversUsed.size,
+            total_orders: totalOrders,
+            total_distance_km: totalDistance,
+            total_time_minutes: totalTime,
+            unscheduled_orders: 0
+        });
+    } catch (error) {
+        console.error('Failed to load route statistics:', error);
+    }
+}
+
+// Load planned routes
+async function loadPlannedRoutes() {
+    try {
+        // Load routes, optionally filtered by driver
+        let endpoint = '/routes?status=planned';
+        if (selectedDriverId !== null) {
+            endpoint = `/routes?status=planned&driver_id=${selectedDriverId}`;
+        }
+        const routes = await apiCall(endpoint);
+
+        // Enrich routes with full details including distances
+        const enrichedRoutes = await Promise.all(
+            routes.map(async (route) => {
+                try {
+                    // Get full route details to calculate distance
+                    const routeDetails = await apiCall(`/routes/${route.id}/visualize`);
+                    // Distance is in summary.total_distance_km
+                    const distance = routeDetails.summary?.total_distance_km ||
+                                   routeDetails.total_distance_km ||
+                                   routeDetails.distance_km || 0;
+
+                    return {
+                        ...route,
+                        distance_km: distance,
+                        total_distance_km: distance,
+                        estimated_distance_km: distance
+                    };
+                } catch (error) {
+                    console.warn(`Failed to get distance for route ${route.id}:`, error);
+                    // Return route without distance if visualization fails
+                    return {
+                        ...route,
+                        distance_km: 0,
+                        total_distance_km: 0,
+                        estimated_distance_km: 0
+                    };
+                }
+            })
+        );
+
+        allRoutes = enrichedRoutes;
+        displayPlannedRoutes(enrichedRoutes);
+        // Routes are now only displayed when clicked, not automatically
+        // Timeline is now shown when route is selected
+    } catch (error) {
+        console.error('Failed to load planned routes:', error);
+    }
+}
+
+// Load drivers for routes page
+async function loadDriversForRoutes() {
+    try {
+        const drivers = await apiCall('/drivers');
+        allDrivers = drivers;
+        displayDriversForRoutes(drivers);
+    } catch (error) {
+        console.error('Failed to load drivers:', error);
+    }
+}
+
+// Display drivers on routes page
+function displayDriversForRoutes(drivers) {
+    const container = document.getElementById('drivers-list-routes');
+    if (!container) return;
+
+    if (!drivers || drivers.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted);">No drivers available</p>';
+        return;
+    }
+
+    container.innerHTML = drivers.map(driver => {
+        const isSelected = selectedDriverId === driver.id;
+        return `
+            <div class="driver-card-routes ${isSelected ? 'selected' : ''}" data-driver-id="${driver.id}" onclick="selectDriverForRoutes(${driver.id})">
+                <div class="driver-avatar">👤</div>
+                <div class="driver-info-routes">
+                    <div class="driver-name-routes">${driver.name}</div>
+                    <div class="driver-status-routes">${driver.status || 'available'}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Select driver and filter routes
+function selectDriverForRoutes(driverId) {
+    // Toggle selection
+    if (selectedDriverId === driverId) {
+        selectedDriverId = null; // Deselect
+    } else {
+        selectedDriverId = driverId; // Select
+    }
+
+    // Update driver cards UI
+    document.querySelectorAll('.driver-card-routes').forEach(card => {
+        if (parseInt(card.dataset.driverId) === selectedDriverId) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    });
+
+    // Reload routes with filter
+    loadPlannedRoutes();
+}
+
+// Make function globally accessible
+if (typeof window !== 'undefined') {
+    window.selectDriverForRoutes = selectDriverForRoutes;
+}
+
+// Display planned routes in the routes list panel
+function displayPlannedRoutes(routes) {
+    const container = document.getElementById('routes-list-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Filter routes by selected driver if any
+    let filteredRoutes = routes;
+    if (selectedDriverId !== null) {
+        filteredRoutes = routes.filter(route => route.driver_id === selectedDriverId);
+    }
+
+    if (!filteredRoutes || filteredRoutes.length === 0) {
+        const message = selectedDriverId
+            ? '<div class="empty-state">No routes assigned to this driver.</div>'
+            : '<div class="empty-state">No routes planned. Click "Plan Routes" to create routes automatically.</div>';
+        container.innerHTML = message;
+        return;
+    }
+
+    filteredRoutes.forEach((route, index) => {
+        const routeCard = document.createElement('div');
+        const routeId = route.id || route.route_id || index;
+        routeCard.className = 'route-card';
+        routeCard.dataset.routeId = routeId;
+
+        const color = route.color || getRouteColor(index);
+        const routeName = route.route_name || route.name || `Route ${index + 1}`;
+
+        // Get order count - prioritize order_count field
+        let orderCount = 0;
+        if (route.order_count !== undefined && route.order_count !== null) {
+            orderCount = route.order_count;
+        } else if (route.route_orders && Array.isArray(route.route_orders)) {
+            orderCount = route.route_orders.length;
+        } else if (route.order_ids && Array.isArray(route.order_ids)) {
+            orderCount = route.order_ids.length;
+        }
+
+        // Get distance - try multiple fields, default to 0 if not found
+        let distance = 0;
+        if (route.total_distance_km !== undefined && route.total_distance_km !== null) {
+            distance = route.total_distance_km;
+        } else if (route.distance_km !== undefined && route.distance_km !== null) {
+            distance = route.distance_km;
+        } else if (route.estimated_distance_km !== undefined && route.estimated_distance_km !== null) {
+            distance = route.estimated_distance_km;
+        }
+
+        // Get driver name from allDrivers array if not in route
+        let driverName = route.driver_name;
+        if (!driverName && route.driver_id && allDrivers.length > 0) {
+            const driver = allDrivers.find(d => d.id === route.driver_id);
+            if (driver) {
+                driverName = driver.name;
+            }
+        }
+
+        routeCard.innerHTML = `
+            <div class="route-color-bar" style="background-color: ${color}"></div>
+            <div class="route-info">
+                <div class="route-header">
+                    <div class="route-name">${routeName}</div>
+                    ${driverName ? `<div class="route-driver-badge">👤 ${driverName}</div>` : ''}
+                </div>
+                <div class="route-stats">
+                    <span class="route-stat">📦 ${orderCount}</span>
+                    <span class="route-stat">🛣️ ${distance.toFixed(1)}km</span>
+                </div>
+                <div class="route-actions">
+                    <button class="btn-route-optimize" onclick="event.stopPropagation(); optimizeRoute(${routeId})" title="Optimize Route">
+                        ⚡ Optimize
+                    </button>
+                    <button class="btn-route-manage" onclick="event.stopPropagation(); manageRouteOrders(${routeId})" title="Manage Orders">
+                        ✏️ Manage Orders
+                    </button>
+                </div>
+            </div>
+        `;
+
+        routeCard.addEventListener('click', () => {
+            selectRouteCard(route, index);
+        });
+
+        container.appendChild(routeCard);
+    });
+}
+
+// Get route color from palette
+function getRouteColor(index) {
+    const colors = [
+        "#9b59b6", "#e91e63", "#00bcd4", "#4caf50", "#ff9800",
+        "#2196f3", "#f44336", "#009688", "#ffc107", "#795548"
+    ];
+    return colors[index % colors.length];
+}
+
+// Select a route card
+function selectRouteCard(route, index) {
+    document.querySelectorAll('.route-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    const routeId = route.id || route.route_id || index;
+    const routeCard = document.querySelector(`.route-card[data-route-id="${routeId}"]`);
+    if (routeCard) {
+        routeCard.classList.add('selected');
+    }
+
+    // View route on map
+    if (route.id || route.route_id) {
+        viewRoute(route.id || route.route_id);
+
+        // If timeline view is active, update it
+        const timelineBtn = document.querySelector('.view-btn[data-view="timeline"]');
+        if (timelineBtn && timelineBtn.classList.contains('active')) {
+            loadTimelineView(route.id || route.route_id);
+        }
+    } else {
+        // No route selected - hide timeline and reset stats
+        hideTimelineView();
+        hideRouteStatistics();
+        // Reset distance and time to default
+        const distanceEl = document.getElementById('stat-distance');
+        const timeEl = document.getElementById('stat-time');
+        if (distanceEl) distanceEl.textContent = '0km';
+        if (timeEl) timeEl.textContent = '0h 0m';
+    }
+}
+
+// Display all routes on map simultaneously
+async function displayAllRoutesOnMap(routes) {
+    if (!routeMap) {
+        setTimeout(() => displayAllRoutesOnMap(routes), 500);
+        return;
+    }
+
+    // Clear existing routes
+    if (currentRouteLayers) {
+        currentRouteLayers.forEach(layer => {
+            routeMap.removeLayer(layer);
+        });
+    }
+    currentRouteLayers = [];
+    currentRouteMarkers = [];
+
+    if (!routes || routes.length === 0) {
+        return;
+    }
+
+    // Load and display each route
+    for (let i = 0; i < routes.length; i++) {
+        const route = routes[i];
+        if (route.id) {
+            try {
+                const routeData = await apiCall(`/routes/${route.id}/visualize`);
+                const color = route.color || getRouteColor(i);
+                displayRouteOnMap(routeData, color, i);
+            } catch (error) {
+                console.error(`Failed to load route ${route.id}:`, error);
+            }
+        }
+    }
+
+    // Fit map to show all routes
+    if (currentRouteLayers.length > 0) {
+        const group = L.featureGroup(currentRouteLayers);
+        routeMap.fitBounds(group.getBounds().pad(0.1));
+    }
+}
+
+// Old timeline functions removed - timeline is now shown next to routes list
+
+// Setup routes panel collapse functionality
+function setupRoutesPanelCollapse() {
+    const toggleBtn = document.getElementById('routes-panel-toggle');
+    const routesPanel = document.getElementById('routes-list-panel');
+
+    if (toggleBtn && routesPanel) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            routesPanel.classList.toggle('collapsed');
+
+            // Update collapse icon
+            const collapseIcon = toggleBtn.querySelector('.collapse-icon');
+            if (collapseIcon) {
+                if (routesPanel.classList.contains('collapsed')) {
+                    collapseIcon.textContent = '▶';
+                } else {
+                    collapseIcon.textContent = '◀';
+                }
+            }
+
+            // Invalidate map size after collapse/expand
+            setTimeout(() => {
+                if (routeMap) {
+                    routeMap.invalidateSize();
+                }
+            }, 300);
+        });
+
+        // Add click handler to expand button (when collapsed) - using event delegation
+        document.addEventListener('click', (e) => {
+            if (routesPanel.classList.contains('collapsed')) {
+                // Check if click is on the expand button (::after pseudo-element)
+                // Since we can't directly detect clicks on ::after, we check if click is near left edge
+                const clickX = e.clientX;
+                const panelRect = routesPanel.getBoundingClientRect();
+
+                // Expand button is at left edge (x=0 to x=40)
+                if (clickX >= 0 && clickX <= 40 && e.target !== toggleBtn) {
+                    routesPanel.classList.remove('collapsed');
+                    const collapseIcon = toggleBtn.querySelector('.collapse-icon');
+                    if (collapseIcon) {
+                        collapseIcon.textContent = '◀';
+                    }
+                    setTimeout(() => {
+                        if (routeMap) {
+                            routeMap.invalidateSize();
+                        }
+                    }, 300);
+                }
+            }
+        });
+    }
+}
+
+// Setup Depots button
+function setupDepotsButton() {
+    const depotsBtn = document.getElementById('depots-btn');
+    if (depotsBtn) {
+        depotsBtn.addEventListener('click', () => {
+            // Switch to locations tab
+            document.querySelector('[data-tab="locations"]')?.click();
+        });
+    }
+}
+
+// Setup timeline view toggle
+function setupTimelineViewToggle() {
+    const timelineBtn = document.querySelector('.view-btn[data-view="timeline"]');
+    if (timelineBtn) {
+        timelineBtn.addEventListener('click', () => {
+            const isActive = timelineBtn.classList.contains('active');
+
+            if (isActive) {
+                // Toggle off
+                timelineBtn.classList.remove('active');
+                hideTimelineView();
+            } else {
+                // Toggle on
+                timelineBtn.classList.add('active');
+                showTimelineView();
+            }
+        });
+    }
+}
+
+// Setup timeline collapse functionality
+function setupTimelineCollapse() {
+    const collapseBtn = document.getElementById('timeline-collapse-btn');
+    const timelineView = document.getElementById('routes-timeline-view');
+
+    if (collapseBtn && timelineView) {
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isCollapsed = timelineView.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                // Expand
+                timelineView.classList.remove('collapsed');
+                const collapseIcon = collapseBtn.querySelector('.collapse-icon');
+                if (collapseIcon) {
+                    collapseIcon.textContent = '▶';
+                }
+            } else {
+                // Collapse
+                timelineView.classList.add('collapsed');
+                const collapseIcon = collapseBtn.querySelector('.collapse-icon');
+                if (collapseIcon) {
+                    collapseIcon.textContent = '◀';
+                }
+            }
+        });
+    }
+}
+
+// Show timeline view (next to routes list)
+function showTimelineView() {
+    const timelineView = document.getElementById('routes-timeline-view');
+
+    if (timelineView) {
+        // Show timeline view
+        timelineView.style.display = 'flex';
+
+        // Load timeline data for selected route
+        const selectedRouteCard = document.querySelector('.route-card.selected');
+        if (selectedRouteCard) {
+            const routeId = selectedRouteCard.dataset.routeId;
+            if (routeId) {
+                loadTimelineView(parseInt(routeId));
+            } else {
+                // If no route selected, show empty state
+                const content = document.getElementById('timeline-view-content');
+                if (content) {
+                    content.innerHTML = '<div class="timeline-error">Select a route to view timeline</div>';
+                }
+            }
+        } else {
+            // If no route selected, show empty state
+            const content = document.getElementById('timeline-view-content');
+            if (content) {
+                content.innerHTML = '<div class="timeline-error">Select a route to view timeline</div>';
+            }
+        }
+    }
+}
+
+// Hide timeline view
+function hideTimelineView() {
+    const timelineView = document.getElementById('routes-timeline-view');
+
+    if (timelineView) {
+        timelineView.style.display = 'none';
+    }
+}
+
+// Load timeline view with stop-to-stop data
+async function loadTimelineView(routeId) {
+    try {
+        const routeData = await apiCall(`/routes/${routeId}/visualize`);
+        displayTimelineView(routeData);
+    } catch (error) {
+        console.error('Failed to load timeline view:', error);
+        const content = document.getElementById('timeline-view-content');
+        if (content) {
+            content.innerHTML = '<div class="timeline-error">Failed to load route timeline</div>';
+        }
+    }
+}
+
+// Display timeline view with stops, distances, and times
+function displayTimelineView(routeData) {
+    const content = document.getElementById('timeline-view-content');
+    if (!content) return;
+
+    if (!routeData.waypoints || routeData.waypoints.length === 0) {
+        content.innerHTML = '<div class="timeline-error">No waypoints in route</div>';
+        return;
+    }
+
+    const waypoints = routeData.waypoints;
+
+    // Calculate distances and times between stops
+    const segments = [];
+    for (let i = 0; i < waypoints.length - 1; i++) {
+        const from = waypoints[i];
+        const to = waypoints[i + 1];
+
+        // Calculate distance using Haversine formula
+        const distance = calculateHaversineDistance(
+            from.lat, from.lng,
+            to.lat, to.lng
+        );
+
+        // Estimate time (assuming 50 km/h average speed with 1.3x buffer)
+        const timeMinutes = (distance / 50) * 60 * 1.3;
+
+        segments.push({
+            from,
+            to,
+            distance_km: distance,
+            time_minutes: timeMinutes
+        });
+    }
+
+    // Build timeline HTML
+    let timelineHtml = `
+        <div class="timeline-stops-container">
+            <div class="timeline-stop-item" data-waypoint-index="0" data-lat="${waypoints[0].lat}" data-lng="${waypoints[0].lng}" data-type="${waypoints[0].type}">
+                <div class="stop-icon stop-${waypoints[0].type}">${getStopIcon(waypoints[0].type)}</div>
+                <div class="stop-info">
+                    <div class="stop-label">${getStopLabel(waypoints[0])}</div>
+                    <div class="stop-details">${getStopDetails(waypoints[0])}</div>
+                </div>
+                <div class="stop-sequence">1</div>
+            </div>
+    `;
+
+    segments.forEach((segment, index) => {
+        const stopIndex = index + 1;
+        const stop = segment.to;
+
+        timelineHtml += `
+            <div class="timeline-segment">
+                <div class="segment-line"></div>
+                <div class="segment-info">
+                    <span class="segment-distance">${segment.distance_km.toFixed(2)} km</span>
+                    <span class="segment-time">${Math.round(segment.time_minutes)} min</span>
+                </div>
+            </div>
+            <div class="timeline-stop-item" data-waypoint-index="${stopIndex}" data-lat="${stop.lat}" data-lng="${stop.lng}" data-type="${stop.type}">
+                <div class="stop-icon stop-${stop.type}">${getStopIcon(stop.type)}</div>
+                <div class="stop-info">
+                    <div class="stop-label">${getStopLabel(stop)}</div>
+                    <div class="stop-details">${getStopDetails(stop)}</div>
+                </div>
+                <div class="stop-sequence">${stopIndex + 1}</div>
+            </div>
+        `;
+    });
+
+    timelineHtml += '</div>';
+
+    content.innerHTML = timelineHtml;
+
+    // Add click handlers to timeline stop items
+    content.querySelectorAll('.timeline-stop-item').forEach(item => {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+            const lat = parseFloat(item.dataset.lat);
+            const lng = parseFloat(item.dataset.lng);
+            const type = item.dataset.type;
+            const waypointIndex = parseInt(item.dataset.waypointIndex);
+            const waypoint = waypoints[waypointIndex];
+
+            showTimelineStopOnMap(lat, lng, waypoint, routeData);
+        });
+    });
+}
+
+// Helper function to calculate Haversine distance
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Helper function to get stop icon
+function getStopIcon(type) {
+    switch(type) {
+        case 'depot': return '🏭';
+        case 'parking': return '🅿️';
+        case 'delivery': return '📦';
+        default: return '📍';
+    }
+}
+
+// Helper function to get stop label
+function getStopLabel(waypoint) {
+    if (waypoint.type === 'depot') {
+        return waypoint.metadata?.name || 'Depot';
+    } else if (waypoint.type === 'parking') {
+        return waypoint.metadata?.name || 'Parking';
+    } else if (waypoint.type === 'delivery') {
+        return waypoint.metadata?.order_number || `Order #${waypoint.metadata?.id || ''}`;
+    }
+    return 'Stop';
+}
+
+// Helper function to get stop details
+function getStopDetails(waypoint) {
+    if (waypoint.type === 'delivery') {
+        return waypoint.metadata?.delivery_address || '';
+    } else if (waypoint.type === 'parking') {
+        return waypoint.metadata?.address || '';
+    } else if (waypoint.type === 'depot') {
+        return waypoint.metadata?.address || '';
+    }
+    return '';
+}
+
+// Show timeline stop on map with detailed card
+function showTimelineStopOnMap(lat, lng, waypoint, routeData) {
+    if (!routeMap) return;
+
+    // Center map on the selected stop
+    routeMap.setView([lat, lng], 16);
+
+    // Remove existing delivery info card
+    if (deliveryInfoCard) {
+        deliveryInfoCard.remove();
+        deliveryInfoCard = null;
+    }
+
+    // Create detailed info card
+    let cardHtml = '';
+
+    if (waypoint.type === 'delivery') {
+        const metadata = waypoint.metadata || {};
+        cardHtml = `
+            <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); max-width: 350px; border: 2px solid #008000;">
+                <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #131320; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span>📦</span> Delivery Details
+                </h3>
+                ${metadata.order_number ? `<p style="margin: 8px 0; color: #131320;"><strong>Order Number:</strong> ${metadata.order_number}</p>` : ''}
+                ${metadata.delivery_address ? `<p style="margin: 8px 0; color: #131320;"><strong>Address:</strong> ${metadata.delivery_address}</p>` : ''}
+                ${metadata.customer_name ? `<p style="margin: 8px 0; color: #131320;"><strong>Customer:</strong> ${metadata.customer_name}</p>` : ''}
+                ${metadata.customer_phone ? `<p style="margin: 8px 0; color: #131320;"><strong>Phone:</strong> ${metadata.customer_phone}</p>` : ''}
+                ${metadata.customer_email ? `<p style="margin: 8px 0; color: #131320;"><strong>Email:</strong> ${metadata.customer_email}</p>` : ''}
+                ${waypoint.estimated_arrival ? `<p style="margin: 8px 0; color: #131320;"><strong>ETA:</strong> ${new Date(waypoint.estimated_arrival).toLocaleString()}</p>` : ''}
+                ${metadata.description ? `<p style="margin: 8px 0; color: #131320;"><strong>Description:</strong> ${metadata.description}</p>` : ''}
+                ${metadata.priority ? `<p style="margin: 8px 0; color: #131320;"><strong>Priority:</strong> <span style="text-transform: uppercase; color: ${metadata.priority === 'urgent' ? '#dc2626' : metadata.priority === 'high' ? '#ea580c' : metadata.priority === 'normal' ? '#059669' : '#6b7280'};">${metadata.priority}</span></p>` : ''}
+            </div>
+        `;
+    } else if (waypoint.type === 'parking') {
+        const metadata = waypoint.metadata || {};
+        cardHtml = `
+            <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); max-width: 350px; border: 2px solid #FFA500;">
+                <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #131320; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span>🅿️</span> Parking Location
+                </h3>
+                ${metadata.name ? `<p style="margin: 8px 0; color: #131320;"><strong>Name:</strong> ${metadata.name}</p>` : ''}
+                ${metadata.address ? `<p style="margin: 8px 0; color: #131320;"><strong>Address:</strong> ${metadata.address}</p>` : ''}
+                ${metadata.distance_to_delivery_km ? `<p style="margin: 8px 0; color: #131320;"><strong>Distance to Delivery:</strong> ${metadata.distance_to_delivery_km.toFixed(2)} km</p>` : ''}
+            </div>
+        `;
+    } else if (waypoint.type === 'depot') {
+        const metadata = waypoint.metadata || {};
+        cardHtml = `
+            <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); max-width: 350px; border: 2px solid #FF0000;">
+                <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #131320; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span>🏭</span> Depot
+                </h3>
+                ${metadata.name ? `<p style="margin: 8px 0; color: #131320;"><strong>Name:</strong> ${metadata.name}</p>` : ''}
+                ${metadata.address ? `<p style="margin: 8px 0; color: #131320;"><strong>Address:</strong> ${metadata.address}</p>` : ''}
+            </div>
+        `;
+    }
+
+    if (cardHtml) {
+        const mapContainer = document.getElementById('route-map-container');
+        if (mapContainer) {
+            deliveryInfoCard = document.createElement('div');
+            deliveryInfoCard.id = 'delivery-info-card';
+            deliveryInfoCard.innerHTML = cardHtml;
+            deliveryInfoCard.style.position = 'absolute';
+            deliveryInfoCard.style.top = '10px';
+            deliveryInfoCard.style.left = '10px';
+            deliveryInfoCard.style.zIndex = '2000';
+            mapContainer.appendChild(deliveryInfoCard);
+        }
+    }
+
+    // Highlight the marker on the map (if it exists)
+    // Find and highlight the corresponding marker
+    currentRouteMarkers.forEach((marker, index) => {
+        const markerLat = marker.getLatLng().lat;
+        const markerLng = marker.getLatLng().lng;
+
+        // Check if this marker matches the clicked waypoint (with small tolerance)
+        if (Math.abs(markerLat - lat) < 0.0001 && Math.abs(markerLng - lng) < 0.0001) {
+            // Open popup if available
+            if (marker.getPopup()) {
+                marker.openPopup();
+            }
+        }
+    });
+}
+
+// Display a planned route on map (for routes that haven't been created yet)
+async function displayPlannedRouteOnMap(route, color, index) {
+    if (!routeMap) {
+        setTimeout(() => displayPlannedRouteOnMap(route, color, index), 500);
+        return;
+    }
+
+    if (!route.order_ids || route.order_ids.length === 0) {
+        return;
+    }
+
+    // Load order locations
+    const orders = [];
+    for (const orderId of route.order_ids) {
+        try {
+            const order = await apiCall(`/orders/${orderId}`);
+            if (order.latitude && order.longitude) {
+                orders.push({
+                    lat: order.latitude,
+                    lng: order.longitude,
+                    order_number: order.order_number,
+                    delivery_address: order.delivery_address
+                });
+            }
+        } catch (error) {
+            console.error(`Failed to load order ${orderId}:`, error);
+        }
+    }
+
+    if (orders.length === 0) {
+        return;
+    }
+
+    // Get depot location
+    const depots = await apiCall('/depots');
+    const depot = depots[0];
+    if (!depot || !depot.latitude || !depot.longitude) {
+        return;
+    }
+
+    // Create waypoints (depot + orders)
+    const waypoints = [
+        { lat: depot.latitude, lng: depot.longitude, type: 'depot' },
+        ...orders.map(o => ({ ...o, type: 'delivery' }))
+    ];
+
+    // Draw route connecting all waypoints
+    const latlngs = waypoints.map(w => [w.lat, w.lng]);
+    const routeLayer = L.polyline(latlngs, {
+        color: color,
+        weight: 5,
+        opacity: 0.7
+    }).addTo(routeMap);
+    currentRouteLayers.push(routeLayer);
+
+    // Add markers for waypoints
+    waypoints.forEach((waypoint, idx) => {
+        const iconColor = waypoint.type === 'depot' ? '#FF0000' : color;
+        const iconHtml = waypoint.type === 'depot' ? '🏭' : '📦';
+        const icon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background-color: ${iconColor}; border: 3px solid white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">${iconHtml}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+
+        const marker = L.marker([waypoint.lat, waypoint.lng], { icon }).addTo(routeMap);
+        marker.bindPopup(`<strong>${waypoint.type.toUpperCase()}</strong><br>${waypoint.order_number || 'Depot'}`);
+        currentRouteMarkers.push(marker);
+        currentRouteLayers.push(marker);
+    });
+}
+
+// ==================== SUMMARY PAGE FUNCTIONS ====================
+
+let summaryCharts = {};
+
+async function loadSummary() {
+    try {
+        const [orders, routes, drivers] = await Promise.all([
+            apiCall('/orders'),
+            apiCall('/routes'),
+            apiCall('/drivers')
+        ]);
+
+        // Calculate metrics
+        const totalOrders = orders.length;
+        const completedOrders = orders.filter(o => o.status === 'completed').length;
+        const activeRoutes = routes.filter(r => r.status === 'in_transit' || r.status === 'planned').length;
+        const activeDrivers = drivers.filter(d => d.status === 'on_route').length;
+
+        // Calculate average delivery time (mock for now - would need actual delivery times)
+        const completedWithTime = orders.filter(o => o.status === 'completed' && o.delivered_at);
+        const avgTime = completedWithTime.length > 0 ? '2.5h' : '-';
+
+        // Calculate success rate
+        const successRate = totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) + '%' : '0%';
+
+        // Update metric cards
+        document.getElementById('metric-total-orders').textContent = totalOrders;
+        document.getElementById('metric-completed').textContent = completedOrders;
+        document.getElementById('metric-active-routes').textContent = activeRoutes;
+        document.getElementById('metric-active-drivers').textContent = activeDrivers;
+        document.getElementById('metric-avg-time').textContent = avgTime;
+        document.getElementById('metric-success-rate').textContent = successRate;
+
+        // Update charts
+        updateStatusChart(orders);
+        updateSourceChart(orders);
+        updateTrendChart(orders);
+        updatePriorityChart(orders);
+
+        // Update recent activity
+        updateRecentActivity(orders);
+    } catch (error) {
+        console.error('Failed to load summary:', error);
+    }
+}
+
+function updateStatusChart(orders) {
+    const ctx = document.getElementById('status-chart-canvas');
+    if (!ctx) return;
+
+    const statusCounts = {
+        pending: 0,
+        assigned: 0,
+        in_transit: 0,
+        completed: 0,
+        failed: 0
+    };
+
+    orders.forEach(order => {
+        const status = order.status || 'pending';
+        if (statusCounts.hasOwnProperty(status)) {
+            statusCounts[status]++;
+        }
+    });
+
+    if (summaryCharts.status) {
+        summaryCharts.status.destroy();
+    }
+
+    summaryCharts.status = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(statusCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')),
+            datasets: [{
+                data: Object.values(statusCounts),
+                backgroundColor: [
+                    '#3b82f6',
+                    '#8b5cf6',
+                    '#f59e0b',
+                    '#10b981',
+                    '#ef4444'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#b0b8c4',
+                        padding: 15
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateSourceChart(orders) {
+    const ctx = document.getElementById('source-chart-canvas');
+    if (!ctx) return;
+
+    const sourceCounts = {};
+    orders.forEach(order => {
+        const source = order.source || 'unknown';
+        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    });
+
+    if (summaryCharts.source) {
+        summaryCharts.source.destroy();
+    }
+
+    summaryCharts.source = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(sourceCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+            datasets: [{
+                label: 'Orders',
+                data: Object.values(sourceCounts),
+                backgroundColor: '#2d89be',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#b0b8c4'
+                    },
+                    grid: {
+                        color: '#1e293b'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#b0b8c4'
+                    },
+                    grid: {
+                        color: '#1e293b'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateTrendChart(orders) {
+    const ctx = document.getElementById('trend-chart-canvas');
+    if (!ctx) return;
+
+    // Group orders by date
+    const dateCounts = {};
+    orders.forEach(order => {
+        if (order.created_at) {
+            const date = new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            dateCounts[date] = (dateCounts[date] || 0) + 1;
+        }
+    });
+
+    const sortedDates = Object.keys(dateCounts).sort((a, b) => {
+        return new Date(a) - new Date(b);
+    }).slice(-7); // Last 7 days
+
+    if (summaryCharts.trend) {
+        summaryCharts.trend.destroy();
+    }
+
+    summaryCharts.trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sortedDates,
+            datasets: [{
+                label: 'Orders',
+                data: sortedDates.map(d => dateCounts[d] || 0),
+                borderColor: '#2d89be',
+                backgroundColor: 'rgba(45, 137, 190, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#b0b8c4'
+                    },
+                    grid: {
+                        color: '#1e293b'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#b0b8c4'
+                    },
+                    grid: {
+                        color: '#1e293b'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updatePriorityChart(orders) {
+    const ctx = document.getElementById('priority-chart-canvas');
+    if (!ctx) return;
+
+    const priorityCounts = {
+        urgent: 0,
+        high: 0,
+        normal: 0,
+        low: 0
+    };
+
+    orders.forEach(order => {
+        const priority = order.priority || 'normal';
+        if (priorityCounts.hasOwnProperty(priority)) {
+            priorityCounts[priority]++;
+        }
+    });
+
+    if (summaryCharts.priority) {
+        summaryCharts.priority.destroy();
+    }
+
+    summaryCharts.priority = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(priorityCounts).map(p => p.charAt(0).toUpperCase() + p.slice(1)),
+            datasets: [{
+                data: Object.values(priorityCounts),
+                backgroundColor: [
+                    '#ef4444',
+                    '#f59e0b',
+                    '#3b82f6',
+                    '#10b981'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#b0b8c4',
+                        padding: 15
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateRecentActivity(orders) {
+    const container = document.getElementById('recent-activity-list');
+    if (!container) return;
+
+    // Get recent orders sorted by updated_at
+    const recentOrders = [...orders]
+        .sort((a, b) => {
+            const dateA = new Date(a.updated_at || a.created_at);
+            const dateB = new Date(b.updated_at || b.created_at);
+            return dateB - dateA;
+        })
+        .slice(0, 10);
+
+    if (recentOrders.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No recent activity</p>';
+        return;
+    }
+
+    container.innerHTML = recentOrders.map(order => {
+        const status = order.status || 'pending';
+        const icon = status === 'completed' ? '✅' : status === 'in_transit' ? '🚚' : status === 'assigned' ? '📋' : '📦';
+        const time = new Date(order.updated_at || order.created_at).toLocaleString();
+
+        return `
+            <div class="activity-item">
+                <div class="activity-icon">${icon}</div>
+                <div class="activity-content">
+                    <div class="activity-title">${order.order_number || `Order #${order.id}`} - ${order.delivery_address || 'No address'}</div>
+                    <div class="activity-time">${time}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function refreshSummary() {
+    loadSummary();
+}
+
+// Make function globally accessible
+if (typeof window !== 'undefined') {
+    window.refreshSummary = refreshSummary;
+}
+
+// ==================== ARCHIVE PAGE FUNCTIONS ====================
+
+async function loadArchive() {
+    try {
+        const statusFilter = document.getElementById('archive-filter-status')?.value || '';
+        const dateFilter = document.getElementById('archive-filter-date')?.value || '';
+
+        // Get all orders and filter for completed/failed
+        const allOrders = await apiCall('/orders');
+        let orders = allOrders.filter(o => {
+            const status = o.status || '';
+            return status === 'completed' || status === 'failed';
+        });
+
+        // Apply status filter if provided
+        if (statusFilter) {
+            orders = orders.filter(o => (o.status || '') === statusFilter);
+        }
+
+        // Filter by date if provided
+        let filteredOrders = orders;
+        if (dateFilter) {
+            const filterDate = new Date(dateFilter);
+            filteredOrders = orders.filter(order => {
+                if (!order.delivered_at && !order.updated_at) return false;
+                const orderDate = new Date(order.delivered_at || order.updated_at);
+                return orderDate.toDateString() === filterDate.toDateString();
+            });
+        }
+
+        // Sort by delivered_at or updated_at descending
+        filteredOrders.sort((a, b) => {
+            const dateA = new Date(a.delivered_at || a.updated_at || 0);
+            const dateB = new Date(b.delivered_at || b.updated_at || 0);
+            return dateB - dateA;
+        });
+
+        // Calculate statistics
+        const now = new Date();
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const thisWeek = filteredOrders.filter(o => {
+            const date = new Date(o.delivered_at || o.updated_at);
+            return date >= weekAgo;
+        }).length;
+
+        const thisMonth = filteredOrders.filter(o => {
+            const date = new Date(o.delivered_at || o.updated_at);
+            return date >= monthAgo;
+        }).length;
+
+        // Update statistics
+        document.getElementById('archive-total').textContent = filteredOrders.length;
+        document.getElementById('archive-month').textContent = thisMonth;
+        document.getElementById('archive-week').textContent = thisWeek;
+
+        // Display archive items
+        displayArchiveItems(filteredOrders);
+    } catch (error) {
+        console.error('Failed to load archive:', error);
+    }
+}
+
+function displayArchiveItems(orders) {
+    const container = document.getElementById('archive-list');
+    if (!container) return;
+
+    if (orders.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No archived deliveries found</div>';
+        return;
+    }
+
+    container.innerHTML = orders.map(order => {
+        const status = order.status || 'completed';
+        const statusClass = status === 'completed' ? 'completed' : 'failed';
+        const deliveredDate = order.delivered_at ? new Date(order.delivered_at).toLocaleString() : 'N/A';
+        const createdDate = order.created_at ? new Date(order.created_at).toLocaleString() : 'N/A';
+
+        // Calculate delivery time if both dates exist
+        let deliveryTime = 'N/A';
+        if (order.created_at && order.delivered_at) {
+            const created = new Date(order.created_at);
+            const delivered = new Date(order.delivered_at);
+            const diffHours = Math.round((delivered - created) / (1000 * 60 * 60));
+            deliveryTime = `${diffHours}h`;
+        }
+
+        return `
+            <div class="archive-item">
+                <div class="archive-item-header">
+                    <div>
+                        <div class="archive-item-title">${order.order_number || `Order #${order.id}`}</div>
+                        <div class="archive-item-meta">
+                            <span class="archive-meta-item">📍 ${order.delivery_address || 'No address'}</span>
+                            <span class="archive-meta-item">👤 ${order.customer_name || 'No name'}</span>
+                            <span class="archive-meta-item">📞 ${order.customer_phone || 'No phone'}</span>
+                        </div>
+                    </div>
+                    <span class="archive-status-badge ${statusClass}">${status}</span>
+                </div>
+                <div class="archive-item-details">
+                    <div class="archive-detail-group">
+                        <span class="archive-detail-label">Delivered At</span>
+                        <span class="archive-detail-value">${deliveredDate}</span>
+                    </div>
+                    <div class="archive-detail-group">
+                        <span class="archive-detail-label">Created At</span>
+                        <span class="archive-detail-value">${createdDate}</span>
+                    </div>
+                    <div class="archive-detail-group">
+                        <span class="archive-detail-label">Delivery Time</span>
+                        <span class="archive-detail-value">${deliveryTime}</span>
+                    </div>
+                    <div class="archive-detail-group">
+                        <span class="archive-detail-label">Source</span>
+                        <span class="archive-detail-value">${order.source || 'N/A'}</span>
+                    </div>
+                    ${order.driver_notes ? `
+                    <div class="archive-detail-group" style="grid-column: 1 / -1;">
+                        <span class="archive-detail-label">Driver Notes</span>
+                        <span class="archive-detail-value">${order.driver_notes}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Make function globally accessible
+if (typeof window !== 'undefined') {
+    window.loadArchive = loadArchive;
 }
